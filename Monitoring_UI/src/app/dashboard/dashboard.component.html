@@ -1,0 +1,79 @@
+<div class="board">
+  <div class="board-head">
+    <div class="board-head-left">
+      <div class="eyebrow gsap-reveal">JARVIS · GROUND OPS</div>
+      <h1 class="headline" #headline [ngClass]="'state-' + fleetStatus">{{ status ? statusHeadline : 'READING TELEMETRY…' }}</h1>
+      <p class="sub gsap-reveal" *ngIf="status as s">
+        {{ counts.up + counts.degraded + counts.down }} services monitored across {{ s.environment }} · refreshed {{ s.generatedAtUtc | date: 'HH:mm:ss':'+0530' }} IST
+      </p>
+    </div>
+  </div>
+
+  <div class="env-tabs" *ngIf="environments.length > 1">
+    <button
+      *ngFor="let env of environments"
+      class="env-tab magnetic"
+      [class.active]="env === selectedEnvironment"
+      (click)="onEnvironmentChange(env)"
+    >{{ env }}</button>
+  </div>
+
+  <div class="banner" *ngIf="lastError" role="alert">
+    Jarvis unreachable — showing last known status below.
+  </div>
+
+  <div class="skeleton-list" *ngIf="loading && !status">
+    <div class="skel skel-row" *ngFor="let i of [0,1,2,3,4,5]" [style.animation-delay.ms]="i * 50"></div>
+  </div>
+
+  <div class="hud-grid" *ngIf="status">
+    <div class="hud-panel hud-vitals">
+      <div class="hud-panel-head">
+        <span class="hud-panel-title">Fleet vitals</span>
+      </div>
+      <div class="vitals-grid">
+        <div class="vital-stat up">
+          <div class="lbl">Operational</div>
+          <div class="val">{{ counts.up }}</div>
+        </div>
+        <div class="vital-stat degraded">
+          <div class="lbl">Degraded</div>
+          <div class="val">{{ counts.degraded }}</div>
+        </div>
+      </div>
+      <div class="vital-down-line">Down <b>{{ counts.down }}</b></div>
+      <div class="hud-module-list">
+        <div class="hud-module-row" *ngFor="let m of sortedModules; trackBy: trackByModule" [ngClass]="severity(m)">
+          <i class="dot" [ngClass]="severity(m)"></i>
+          <span class="hud-module-name">{{ m.module }}</span>
+          <span class="hud-module-uptime">{{ m.uptimePercent24h }}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="globe-stage hud-globe">
+      <div class="assistant-title">J&nbsp;&middot;&nbsp;A&nbsp;&middot;&nbsp;R&nbsp;&middot;&nbsp;V&nbsp;&middot;&nbsp;I&nbsp;&middot;&nbsp;S</div>
+      <div class="assistant-hint">{{ selectedEnvironment || 'Ground ops' }} status uplink</div>
+      <div class="globe-canvas-wrap">
+        <div class="globe-ring"></div>
+        <div class="globe-ring r2"></div>
+        <app-hud-globe [status]="fleetStatus"></app-hud-globe>
+      </div>
+      <div class="assistant-status" [ngClass]="fleetStatus">{{ statusHeadline }}</div>
+    </div>
+
+    <div class="hud-panel hud-attention">
+      <div class="hud-panel-head">
+        <span class="hud-panel-title">Attention</span>
+      </div>
+      <div class="hud-module-list" *ngIf="attentionModules.length; else allNominal">
+        <div class="hud-module-row" *ngFor="let m of attentionModules; trackBy: trackByModule" [ngClass]="severity(m)">
+          <i class="dot" [ngClass]="severity(m)"></i>
+          <span class="hud-module-name">{{ m.module }}</span>
+          <span class="hud-module-uptime">{{ m.uptimePercent24h }}%</span>
+        </div>
+      </div>
+      <ng-template #allNominal><div class="hud-empty">All systems nominal</div></ng-template>
+    </div>
+  </div>
+</div>

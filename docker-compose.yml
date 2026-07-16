@@ -1,0 +1,56 @@
+services:
+  monitoring-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: monitoring
+      POSTGRES_USER: monitoring
+      POSTGRES_PASSWORD: ${MONITORING_DB_PASSWORD:-monitoring}
+    volumes:
+      - monitoring-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitoring -d monitoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  monitoring-api:
+    build:
+      context: ./Monitoring_API
+    environment:
+      ASPNETCORE_ENVIRONMENT: QA
+      ConnectionStrings__MonitoringDb: "Host=monitoring-db;Database=monitoring;Username=monitoring;Password=${MONITORING_DB_PASSWORD:-monitoring}"
+      # Local-verification-only default credentials — override via env vars
+      # (MONITORING_BASIC_AUTH_USER / MONITORING_BASIC_AUTH_PASSWORD) or change
+      # these before this ever runs anywhere shared (self-hosted agent, etc.).
+      BasicAuth__Username: ${MONITORING_BASIC_AUTH_USER:-devops}
+      BasicAuth__Password: ${MONITORING_BASIC_AUTH_PASSWORD:-Cargo-Watch-2026!}
+      Cors__AllowedOrigins__0: "http://localhost:8081"
+      # Azure DevOps pipeline dashboard (Sentinel-ported). Leave blank to disable —
+      # the /api/pipelines endpoint then returns { ok:false, msg:"...not configured" }.
+      AzureDevOps__Org: ${AZURE_DEVOPS_ORG:-}
+      AzureDevOps__Project: ${AZURE_DEVOPS_PROJECT:-}
+      AzureDevOps__Pat: ${AZURE_DEVOPS_PAT:-}
+      AzureDevOps__ApiVersion: ${AZURE_DEVOPS_API_VERSION:-7.1}
+      # Ocelot auto-importer watches this directory (bind-mounted below).
+      Ocelot__Directory: /app/ocelot
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+    expose:
+      - "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      # Drop an Ocelot gateway JSON here to auto-create monitored targets.
+      - ./ocelot:/app/ocelot
+
+  monitoring-ui:
+    build:
+      context: ./Monitoring_UI
+    depends_on:
+      - monitoring-api
+    ports:
+      - "8081:8080"
+
+volumes:
+  monitoring-db-data:

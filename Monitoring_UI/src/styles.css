@@ -1,0 +1,162 @@
+@import './motion.css';
+
+/* Jarvis — global tokens, ported 1:1 from the reference "agentic-os-personal"
+   red/black glass HUD design (F:\Claude_Test\PRoject\Theme\agentic-os-personal). */
+:root {
+  --bg: #050507;
+  --bg-mesh-1: rgba(255, 43, 43, 0.14);
+  --bg-mesh-2: rgba(255, 60, 60, 0.06);
+
+  --surface: rgba(14, 12, 14, 0.82);
+  --surface-solid: #0d0b0d;
+  --surface-raised: #141115;
+  --surface-hover: #1d171c;
+
+  --border: rgba(255, 70, 70, 0.16);
+  --border-strong: rgba(255, 70, 70, 0.32);
+
+  --text: #f5f5f5;
+  --text-secondary: #c9c5c7;
+  --muted: #8a8487;
+
+  --accent: #ff2b2b;
+  --accent-hover: #ff5a5a;
+  --accent-soft: rgba(255, 43, 43, 0.14);
+  --accent-glow: rgba(255, 43, 43, 0.45);
+  --accent2: #ffffff;
+  --accent2-soft: rgba(255, 255, 255, 0.1);
+  --warn: #fbbf24;
+  --error: #f87171;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.65);
+
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Legacy token names — kept as aliases so existing component CSS (written
+     before this reference-matching pass) keeps working unchanged. New
+     markup (header, tabs-nav, hud-grid, cards) should use the tokens above. */
+  --panel: var(--surface);
+  --panel-raised: var(--surface-raised);
+  --hairline: var(--border);
+  --hairline-strong: var(--border-strong);
+  --text-dim: var(--text-secondary);
+  --text-faint: var(--muted);
+  --signal-up: #00ff88;
+  --signal-caution: #ffaa00;
+  --signal-down: #ff3366;
+  --beacon: var(--accent);
+  --beacon-blue: #b00d0d;
+  --glow: 0 0 12px var(--accent-soft);
+  --glow-strong: 0 0 22px rgba(255, 43, 43, 0.3);
+  --glass-blur: blur(16px);
+  --font-display: var(--font);
+  --font-body: var(--font);
+  --font-data: var(--mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+body {
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% -30%, var(--bg-mesh-1), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, var(--bg-mesh-2), transparent 50%);
+  background-attachment: fixed;
+}
+
+body.hud-mode {
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 42%, var(--bg-mesh-1), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, var(--bg-mesh-2), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, var(--bg-mesh-2), transparent 55%);
+}
+
+a {
+  color: var(--beacon);
+  text-decoration: none;
+  transition: color var(--dur-fast, 150ms) ease, text-shadow var(--dur-fast, 150ms) ease;
+}
+
+a:hover {
+  color: #ff5c5c;
+  text-shadow: 0 0 8px rgba(255, 43, 43, 0.5);
+}
+
+::selection {
+  background: var(--beacon);
+  color: #04070d;
+}
+
+:focus-visible {
+  outline: 2px solid var(--beacon);
+  outline-offset: 2px;
+  transition: outline-offset var(--dur-fast) var(--ease-standard);
+}
+
+button, input, select, .env-tab, .tabs button {
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+/* Headings carry the HUD identity everywhere by default — components can
+   override where a quieter treatment is deliberately wanted. */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Slim red-glow scrollbar, matching the reference theme. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 3, 3, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 43, 43, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 43, 43, 0.5);
+}
+
+/* Custom HUD cursor: the component adds this class once it's attached. */
+body.has-custom-cursor,
+body.has-custom-cursor * {
+  cursor: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

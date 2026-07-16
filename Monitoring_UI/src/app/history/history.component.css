@@ -1,0 +1,223 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  animation: jv-fade-up var(--dur-entrance) var(--ease-standard) both;
+}
+
+.history {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ── Page head ─────────────────────────────────────────────────────────── */
+
+.main-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.head-text h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.env-tabs { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.env-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.env-tab:hover { border-color: var(--accent); color: var(--text); box-shadow: 0 0 12px var(--accent-soft); }
+.env-tab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); }
+
+/* ── Banners / skeleton ───────────────────────────────────────────────── */
+
+.banner { padding: 10px 16px; border-radius: var(--radius-sm); margin-bottom: 20px; font-size: 0.85rem; }
+.banner.err { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.35); color: var(--error, #f87171); }
+
+.skeleton-list { display: flex; flex-direction: column; gap: 8px; }
+.skel-row {
+  height: 80px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  animation: jv-fade-in var(--dur-fast) var(--ease-standard) both, jv-shimmer 1.6s ease-in-out infinite;
+}
+
+/* ── Cards (matches reference .card) ─────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.insights { margin-bottom: 20px; }
+
+.insight-list { display: flex; flex-direction: column; gap: 10px; }
+.insight-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.chip-module { font-weight: 700; color: var(--text); margin-right: 4px; }
+.chip-flag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border: 1px solid var(--border-strong);
+}
+.chip-flag.flaky, .chip-flag.anomaly { background: rgba(251, 191, 36, 0.14); color: var(--warn, #fbbf24); border-color: rgba(251, 191, 36, 0.35); }
+.chip-flag.degrading { background: rgba(248, 113, 113, 0.14); color: var(--error, #f87171); border-color: rgba(248, 113, 113, 0.35); }
+.chip-flag.improving { background: rgba(52, 211, 153, 0.14); color: #34d399; border-color: rgba(52, 211, 153, 0.35); }
+
+.muted { color: var(--muted); font-size: 0.82rem; }
+.muted.small { font-size: 0.76rem; margin: 4px 0 0; }
+
+/* ── Search ───────────────────────────────────────────────────────────── */
+
+.search {
+  width: 100%;
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  outline: none;
+}
+.search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── Module cards (matches reference .feed-card / .sched-item) ──────────── */
+
+.modules { display: flex; flex-direction: column; gap: 14px; }
+
+.module-card {
+  padding: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.module-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.module-name { font-family: var(--font); font-weight: 700; font-size: 0.95rem; color: var(--text); }
+.module-uptime { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); }
+
+.timeline {
+  width: 100%;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: var(--surface-hover);
+}
+.timeline rect.up { fill: #34d399; opacity: 0.85; }
+.timeline rect.down { fill: var(--error, #f87171); }
+
+.incidents { display: flex; flex-direction: column; gap: 8px; }
+.incident { border-left: 3px solid var(--border-strong); padding: 6px 0 6px 10px; }
+.incident.ongoing { border-left-color: var(--error, #f87171); }
+
+.incident-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.incident-text { font-size: 0.82rem; color: var(--text-secondary); }
+
+/* ── Badges ───────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  border: 1px solid var(--border-strong);
+}
+.badge.db { background: rgba(167, 139, 250, 0.14); color: #a78bfa; border-color: rgba(167, 139, 250, 0.35); }
+.badge.ongoing-badge { background: rgba(248, 113, 113, 0.14); color: var(--error, #f87171); border-color: rgba(248, 113, 113, 0.35); }
+
+.raw { margin-top: 4px; font-size: 0.74rem; }
+.raw summary { cursor: pointer; color: var(--muted); }
+.raw code {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-hover);
+  color: #fca5a5;
+  font-family: var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .main-head { flex-direction: column; align-items: stretch; }
+  /* ~30 environment buttons wrapping on a narrow screen pushes everything
+     else below the fold — scroll horizontally in one row instead. */
+  .env-tabs {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .env-tab { flex-shrink: 0; }
+}

@@ -1,0 +1,122 @@
+<div class="pipelines">
+  <div class="main-head">
+    <h3>Azure DevOps Pipelines</h3>
+    <button class="header-btn magnetic" (click)="refresh()" [disabled]="loading">
+      {{ loading ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  <div class="pl-grid" *ngIf="loading && !data">
+    <div class="card pl-item skel-card" *ngFor="let i of [0,1,2,3]" [style.animation-delay.ms]="i * 60">
+      <div class="skel skel-title"></div>
+      <div class="skel skel-row"></div>
+    </div>
+  </div>
+
+  <div class="banner" *ngIf="fetchError">Could not reach the pipelines endpoint.</div>
+
+  <ng-container *ngIf="data as d">
+    <div class="banner warn" *ngIf="!d.ok">
+      Azure DevOps is not configured — {{ d.msg || 'set AZURE_DEVOPS_ORG / PROJECT / PAT to enable.' }}
+    </div>
+
+    <ng-container *ngIf="d.ok">
+      <!-- Bulk build-trigger results (admin only) -->
+      <div class="trigger-results card" *ngIf="triggerResults.length">
+        <div class="trigger-row" *ngFor="let r of triggerResults" [class.fail]="!r.ok">
+          <span *ngIf="r.ok">✓ Queued <a [href]="r.url" target="_blank" rel="noopener">build #{{ r.buildId }}</a> for {{ r.name }}</span>
+          <span *ngIf="!r.ok">✗ {{ r.name }}: {{ r.error }}</span>
+        </div>
+        <button class="header-btn sm" (click)="clearSelection()">Dismiss</button>
+      </div>
+
+      <section class="card card-main" *ngIf="d.buildPipelines.length">
+        <div class="main-head">
+          <h3>Build pipelines</h3>
+          <div class="select-bar" *ngIf="auth.isAdmin() && selectedDefinitionIds.size > 0">
+            <span class="chip">{{ selectedDefinitionIds.size }} selected</span>
+            <input
+              class="branch-input"
+              type="text"
+              [(ngModel)]="triggerBranch"
+              placeholder="branch (default)"
+              [disabled]="triggering"
+            />
+            <button class="header-btn sm" (click)="clearSelection()" [disabled]="triggering">Clear</button>
+            <button class="btn-primary compact trigger-btn magnetic" (click)="triggerSelected()" [disabled]="triggering">
+              {{ triggering ? 'Triggering…' : 'Trigger ' + selectedDefinitionIds.size + ' build' + (selectedDefinitionIds.size === 1 ? '' : 's') }}
+            </button>
+          </div>
+        </div>
+        <div class="pl-grid">
+          <div class="pl-item" *ngFor="let p of d.buildPipelines; let i = index; trackBy: trackBuild" [class.selected]="isSelected(p.id)">
+            <div class="pl-item-head">
+              <span class="pl-name" [title]="p.path">
+                <input
+                  *ngIf="auth.isAdmin()"
+                  type="checkbox"
+                  class="select-check"
+                  [checked]="isSelected(p.id)"
+                  (change)="toggleSelected(p.id, $any($event.target).checked)"
+                />
+                {{ p.name }}
+              </span>
+              <span class="badge" [ngClass]="statusClass(p.latestStatus)">{{ p.latestStatus }}</span>
+            </div>
+            <div class="pl-meta" *ngIf="p.latestBuildNumber">
+              <span>#{{ p.latestBuildNumber }}</span>
+              <span *ngIf="p.latestBranch">· {{ p.latestBranch }}</span>
+              <span *ngIf="p.latestRequestedBy">· {{ p.latestRequestedBy }}</span>
+              <span *ngIf="p.latestFinished">· {{ p.latestFinished | date: 'MMM d, HH:mm':'+0530' }}</span>
+            </div>
+            <div class="pl-meta muted" *ngIf="!p.latestBuildNumber">No recent builds</div>
+
+            <button
+              class="icon-btn errbtn"
+              *ngIf="p.latestBuildId && statusClass(p.latestStatus) === 'fail'"
+              (click)="toggleErrors(p.latestBuildId)"
+            >
+              {{ expandedErrors[p.latestBuildId] ? 'Hide errors' : 'Show failed tasks' }}
+            </button>
+
+            <div class="errors jv-fade-up-el" *ngIf="p.latestBuildId && expandedErrors[p.latestBuildId] as recs">
+              <div class="loading" *ngIf="loadingErrors[p.latestBuildId]">Loading…</div>
+              <div class="errrec" *ngFor="let r of recs">
+                <div class="errname">{{ r.name }} <span class="badge fail">{{ r.result }}</span></div>
+                <div class="errmsg" *ngFor="let i of r.issues">{{ i.message }}</div>
+              </div>
+              <div class="muted" *ngIf="!recs.length">No task-level errors reported.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-main" *ngIf="d.releasePipelines.length">
+        <div class="main-head">
+          <h3>Release pipelines</h3>
+        </div>
+        <div class="pl-grid">
+          <div class="pl-item" *ngFor="let p of d.releasePipelines; let i = index; trackBy: trackRelease">
+            <div class="pl-item-head">
+              <span class="pl-name" [title]="p.path">{{ p.name }}</span>
+              <span class="badge" [ngClass]="statusClass(p.latestStatus)">{{ p.latestStatus }}</span>
+            </div>
+            <div class="pl-meta" *ngIf="p.latestReleaseName">
+              <span>{{ p.latestReleaseName }}</span>
+              <span *ngIf="p.latestFinished">· {{ p.latestFinished | date: 'MMM d, HH:mm':'+0530' }}</span>
+            </div>
+            <div class="envs" *ngIf="p.latestEnvironments.length">
+              <span class="env chip" *ngFor="let e of p.latestEnvironments" [ngClass]="statusClass(e.status)">
+                {{ e.name }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="banner" *ngIf="!d.buildPipelines.length && !d.releasePipelines.length">
+        No pipelines returned for this project.
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

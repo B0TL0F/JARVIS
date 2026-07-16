@@ -1,0 +1,79 @@
+/* Jarvis — shared motion system. One vocabulary of transitions/keyframes used
+   across every view, kept deliberately quiet: entrances settle in ~0.4s with a
+   slight upward drift, nothing bounces or overshoots. Respects reduced-motion. */
+
+:root {
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-entrance: 420ms;
+}
+
+@keyframes jv-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes jv-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes jv-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+
+@keyframes jv-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(255, 93, 93, 0.5)); }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+
+/* Entrance: applied to :host of each top-level view so it plays once per
+   navigation (the component is created fresh each time *ngIf swaps views). */
+.jv-enter {
+  animation: jv-fade-up var(--dur-entrance) var(--ease-standard) both;
+}
+
+/* Per-item stagger: pair with [style.animation-delay.ms]="i * N" in *ngFor. */
+.jv-stagger {
+  opacity: 0;
+  animation: jv-fade-up var(--dur-base) var(--ease-standard) both;
+}
+
+/* Skeleton loading blocks — shimmer replaces plain "Loading…" text. */
+.skel {
+  border-radius: 4px;
+  background: linear-gradient(
+    100deg,
+    var(--panel) 30%,
+    var(--panel-raised) 50%,
+    var(--panel) 70%
+  );
+  background-size: 200% 100%;
+  animation: jv-shimmer 1.6s ease-in-out infinite;
+}
+
+.skel-title { height: 14px; width: 40%; margin-bottom: 10px; }
+.skel-row { height: 40px; width: 100%; margin-bottom: 6px; }
+
+/* Status dots: urgency-driven motion only — steady "up" stays calm, degraded
+   and down pulse to draw the eye. Uses --pulse-color set per state in component CSS. */
+.jv-pulse {
+  animation: jv-pulse-ring 1.6s ease-in-out infinite;
+}
+
+/* IMPORTANT: .jv-enter/.jv-stagger start from opacity:0 and rely on the animation's
+   "both" fill-mode to land on opacity:1 — that's the only rule that ever sets
+   opacity back to 1. Under reduced-motion we must NOT disable the animation outright
+   (animation: none would strand the element at its opacity:0 starting keyframe,
+   invisible forever with zero console errors). Instead let the global
+   animation-duration:0.001ms override in styles.css shrink it to instantaneous while
+   the fill-mode still resolves the element to its visible end state.
+   Only decorative infinite loops (shimmer, pulse rings) — which don't gate an
+   element's base visibility — are safe to fully disable here. */
+@media (prefers-reduced-motion: reduce) {
+  .skel, .jv-pulse {
+    animation: none !important;
+  }
+}

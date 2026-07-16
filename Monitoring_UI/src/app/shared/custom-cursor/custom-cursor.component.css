@@ -1,0 +1,60 @@
+:host {
+  display: contents;
+}
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100000;
+  pointer-events: none;
+  border-radius: 50%;
+  will-change: transform;
+  /* Hidden until the first real mousemove repositions it via JS — never
+     sits visibly frozen in the top-left corner if JS is slow to attach. */
+  opacity: 0;
+}
+
+.cursor-dot.armed,
+.cursor-ring.armed {
+  opacity: 1;
+}
+
+.cursor-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--beacon, #ff2b2b);
+  box-shadow: 0 0 6px rgba(255, 43, 43, 0.8);
+  transition: opacity 160ms ease;
+}
+
+.cursor-ring {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 43, 43, 0.55);
+  box-shadow: 0 0 10px rgba(255, 43, 43, 0.25), inset 0 0 8px rgba(255, 43, 43, 0.12);
+  transition: width 160ms ease, height 160ms ease, border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+/* Crosshair ticks, HUD-style. */
+.cursor-ring::before,
+.cursor-ring::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 43, 43, 0.6);
+}
+.cursor-ring::before { top: -5px; left: calc(50% - 0.5px); width: 1px; height: 4px; }
+.cursor-ring::after { left: -5px; top: calc(50% - 0.5px); height: 1px; width: 4px; }
+
+.cursor-ring.hover {
+  width: 44px;
+  height: 44px;
+  border-color: rgba(255, 43, 43, 0.9);
+  box-shadow: 0 0 18px rgba(255, 43, 43, 0.45), inset 0 0 12px rgba(255, 43, 43, 0.18);
+}
+
+.cursor-ring.pressed {
+  width: 26px;
+  height: 26px;
+}

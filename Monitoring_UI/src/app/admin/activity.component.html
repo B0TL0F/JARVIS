@@ -1,0 +1,32 @@
+<div class="admin card card-main">
+  <div class="main-head">
+    <h2>Activity log</h2>
+    <div class="pager">
+      <button class="header-btn" (click)="prev()" [disabled]="page <= 1 || loading">‹ Prev</button>
+      <span class="mono">{{ page }} / {{ totalPages }}</span>
+      <button class="header-btn" (click)="next()" [disabled]="page >= totalPages || loading">Next ›</button>
+    </div>
+  </div>
+
+  <div class="banner err" *ngIf="error">{{ error }}</div>
+
+  <div class="skeleton-list" *ngIf="loading">
+    <div class="skel skel-row" *ngFor="let i of [0,1,2,3,4]" [style.animation-delay.ms]="i * 50"></div>
+  </div>
+
+  <table class="grid" *ngIf="!loading">
+    <thead>
+      <tr><th>Time (IST)</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr>
+    </thead>
+    <tbody>
+      <tr class="jv-stagger" *ngFor="let a of items; let i = index; trackBy: trackById" [style.animation-delay.ms]="i * 25">
+        <td class="mono">{{ a.createdAtUtc | date: 'MMM d, HH:mm:ss':'+0530' }}</td>
+        <td>{{ a.username }}</td>
+        <td><span class="action chip">{{ a.action }}</span></td>
+        <td class="details">{{ a.details }}</td>
+        <td class="mono muted">{{ a.ip }}</td>
+      </tr>
+      <tr *ngIf="!items.length"><td colspan="5" class="muted">No activity yet.</td></tr>
+    </tbody>
+  </table>
+</div>

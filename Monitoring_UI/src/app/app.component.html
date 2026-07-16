@@ -1,0 +1,50 @@
+<app-jarvis-boot></app-jarvis-boot>
+<app-custom-cursor></app-custom-cursor>
+
+<ng-container *ngIf="auth.isAuthenticated(); else loginGate">
+  <div class="app">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">&#9678;</div>
+        <div>
+          <h1>Jarvis</h1>
+          <p class="subtitle">Ground Ops &middot; Pipelines &middot; History &middot; Targets</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn back-hud" *ngIf="view !== 'dashboard'" (click)="go('dashboard')">&larr; Dashboard</button>
+        <span class="status-pill" [ngClass]="auth.role()">{{ auth.role() }}</span>
+        <button class="header-btn" (click)="logout()">Sign out</button>
+
+        <div class="nav-menu" #navMenu>
+          <button class="header-btn burger" [class.active]="menuOpen" (click)="toggleMenu()" aria-label="Menu" [attr.aria-expanded]="menuOpen">
+            <span class="burger-bar"></span>
+            <span class="burger-bar"></span>
+            <span class="burger-bar"></span>
+          </button>
+
+          <nav class="nav-dropdown" *ngIf="menuOpen">
+            <button class="navtab" [class.active]="view === 'pipelines'" (click)="go('pipelines')">Pipelines</button>
+            <button class="navtab" [class.active]="view === 'history'" (click)="go('history')">History</button>
+            <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'targets'" (click)="go('targets')">Targets</button>
+            <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'users'" (click)="go('users')">Users</button>
+            <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'activity'" (click)="go('activity')">Activity</button>
+            <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'settings'" (click)="go('settings')">Settings</button>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main class="viewport" #viewport>
+      <app-dashboard *ngIf="view === 'dashboard'"></app-dashboard>
+      <app-pipelines *ngIf="view === 'pipelines'"></app-pipelines>
+      <app-history *ngIf="view === 'history'"></app-history>
+      <app-targets *ngIf="view === 'targets' && auth.isAdmin()"></app-targets>
+      <app-users *ngIf="view === 'users' && auth.isAdmin()"></app-users>
+      <app-activity *ngIf="view === 'activity' && auth.isAdmin()"></app-activity>
+      <app-settings *ngIf="view === 'settings' && auth.isAdmin()"></app-settings>
+    </main>
+  </div>
+</ng-container>
+
+<ng-template #loginGate><app-login></app-login></ng-template>

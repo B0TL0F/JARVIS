@@ -1,0 +1,91 @@
+<div class="history">
+  <div class="main-head">
+    <div class="head-text">
+      <h3>History &amp; Insights</h3>
+      <p class="hint">
+        Every up/down check is kept for 7 days. This page shows when each module went down, for how long, and why —
+        plus a few heuristic "smart" flags (flaky behavior, slower-than-usual responses, trending uptime) computed
+        entirely from that history, no external AI service involved.
+      </p>
+    </div>
+
+    <div class="env-tabs" *ngIf="environments.length > 1">
+      <button
+        *ngFor="let env of environments"
+        class="env-tab magnetic"
+        [class.active]="env === selectedEnvironment"
+        (click)="onEnvironmentChange(env)"
+      >{{ env }}</button>
+    </div>
+  </div>
+
+  <div class="banner err" *ngIf="error">{{ error }}</div>
+
+  <div class="skeleton-list" *ngIf="loading">
+    <div class="skel skel-row" *ngFor="let i of [0,1,2,3]" [style.animation-delay.ms]="i * 60"></div>
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <!-- Insights -->
+    <section class="card insights">
+      <h2>Insights</h2>
+      <div class="insight-list" *ngIf="flaggedInsights.length; else noInsights">
+        <div class="insight-card" *ngFor="let i of flaggedInsights">
+          <span class="chip-module">{{ i.module }}</span>
+          <span class="chip-flag flaky" *ngIf="i.isFlaky">FLAKY · {{ i.flipsLastHour }} flips/hr</span>
+          <span class="chip-flag anomaly" *ngIf="i.isResponseTimeAnomalous">
+            SLOW · {{ i.latestResponseTimeMs }}ms vs ~{{ i.baselineResponseTimeMs }}ms baseline
+          </span>
+          <span class="chip-flag" [ngClass]="i.trend" *ngIf="i.trend !== 'stable'">
+            {{ i.trend === 'degrading' ? 'TRENDING DOWN' : 'TRENDING UP' }} ·
+            {{ i.uptimePrevious24h }}% → {{ i.uptimeLast24h }}%
+          </span>
+        </div>
+      </div>
+      <ng-template #noInsights>
+        <p class="muted">No anomalies detected — every module is behaving within its normal baseline.</p>
+      </ng-template>
+    </section>
+
+    <!-- Search -->
+    <input class="search" type="search" [(ngModel)]="search" placeholder="Filter by module…" />
+
+    <!-- Per-module timeline + incident log -->
+    <div class="modules">
+      <div class="card module-card" *ngFor="let m of filteredModules; trackBy: trackByModule">
+        <div class="module-head">
+          <span class="module-name">{{ m.module }}</span>
+          <span class="module-uptime" *ngIf="m.insight">{{ m.insight.uptimeLast24h }}% / 24h</span>
+        </div>
+
+        <!-- Hand-built SVG status-timeline bar: one segment per bucket, green/red -->
+        <svg class="timeline" *ngIf="m.buckets.length" [attr.viewBox]="'0 0 ' + m.buckets.length + ' 10'" preserveAspectRatio="none">
+          <rect
+            *ngFor="let b of m.buckets; let bi = index"
+            [attr.x]="bi" y="0" width="1" height="10"
+            [ngClass]="b.isUp ? 'up' : 'down'"
+          >
+            <title>{{ b.bucketStartUtc | date: 'MMM d, HH:mm':'+0530' }} IST — {{ b.isUp ? 'up' : 'down' }}</title>
+          </rect>
+        </svg>
+
+        <div class="incidents" *ngIf="m.incidents.length; else noIncidents">
+          <div class="incident" *ngFor="let inc of m.incidents; trackBy: trackByIncident" [class.ongoing]="!inc.resolvedAtUtc">
+            <div class="incident-summary">
+              <span class="badge" [ngClass]="inc.checkType.toLowerCase()">{{ inc.checkType }}</span>
+              <span class="incident-text">{{ inc.summary }}</span>
+              <span class="badge ongoing-badge" *ngIf="!inc.resolvedAtUtc">ONGOING</span>
+            </div>
+            <details class="raw" *ngIf="inc.errorMessage">
+              <summary>Raw error</summary>
+              <code>{{ inc.errorMessage }}</code>
+            </details>
+          </div>
+        </div>
+        <ng-template #noIncidents>
+          <p class="muted small">No incidents in the last 7 days.</p>
+        </ng-template>
+      </div>
+    </div>
+  </ng-container>
+</div>

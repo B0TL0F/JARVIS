@@ -1,0 +1,24 @@
+<div class="gate">
+  <div class="panel">
+    <div class="eyebrow">JARVIS · ACCESS CONTROL</div>
+    <h1>Sign in to Jarvis</h1>
+    <p class="sub">Credentials gate the live status board for all 14 services.</p>
+
+    <form (ngSubmit)="submit()">
+      <label>
+        <span>Operator ID</span>
+        <input type="text" name="username" [(ngModel)]="username" autocomplete="username" autofocus />
+      </label>
+      <label>
+        <span>Passcode</span>
+        <input type="password" name="password" [(ngModel)]="password" autocomplete="current-password" />
+      </label>
+
+      <div class="error" *ngIf="error" role="alert">{{ error }}</div>
+
+      <button type="submit" [disabled]="submitting">
+        {{ submitting ? 'Verifying…' : 'Enter Jarvis' }}
+      </button>
+    </form>
+  </div>
+</div>

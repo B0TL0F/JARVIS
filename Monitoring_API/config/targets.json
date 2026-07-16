@@ -1,0 +1,247 @@
+{
+  "Monitoring": {
+    "PollingIntervalSeconds": 60,
+    "HttpTimeoutSeconds": 15,
+    "RetentionDays": 7,
+    "Environments": [
+      {
+        "Name": "QA",
+        "UiBaseUrl": "https://acsint.kalelogistics.com",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "acsintapi.azurewebsites.net" },
+          { "Module": "ContentMgt", "RoutePrefix": "api_contentmgt", "ApiHost": "acsintContentmgtAPI.azurewebsites.net", "UiVirtualPath": "ContentmgtUI" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "edinotificationapi.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "acsintexportapi.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "acsinthangfireapi.azurewebsites.net" },
+          { "Module": "Hospitality", "RoutePrefix": "api_hospitality", "ApiHost": "hospitalityapi.azurewebsites.net", "UiVirtualPath": "HospitalityUI" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "acsintimportapi.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "LCCT", "RoutePrefix": "api_lcct", "ApiHost": "acsintlcctapi.azurewebsites.net", "UiVirtualPath": "LcctUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "acsintmasterapi.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "acsintpassengerapi.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "acsintpcsapi.azurewebsites.net", "UiVirtualPath": "PcsUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "acsinttariffapi.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "acsinttsmapi.azurewebsites.net", "UiVirtualPath": "TsmUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "acsintworkflowapi.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "DEV",
+        "UiBaseUrl": "https://ACS2DevUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2DevAPI.azurewebsites.net" },
+          { "Module": "ContentMgt", "RoutePrefix": "api_contentmgt", "ApiHost": "ACS2DevContentmgt.azurewebsites.net", "UiVirtualPath": "ContentmgtUI" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2DevEDINotification.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2DevExport.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2DevHangfire.azurewebsites.net" },
+          { "Module": "Hospitality", "RoutePrefix": "api_hospitality", "ApiHost": "ACS2DevHospitality.azurewebsites.net", "UiVirtualPath": "HospitalityUI" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2DevImport.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "LCCT", "RoutePrefix": "api_lcct", "ApiHost": "ACS2DevLCCT.azurewebsites.net", "UiVirtualPath": "LCCTUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2DevMaster.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "ACS2DevPassenger.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACS2DevPcs.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2DevTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2DevTsm.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2DevWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "PT",
+        "UiBaseUrl": "https://ACSPerfUI-test.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACSPerfAPIgateway-2.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACSPerfMessagebroker.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACSPerfExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACSPerfHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACSPerfimports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "LCCT", "RoutePrefix": "api_lcct", "ApiHost": "ACSPerfLCCT.azurewebsites.net", "UiVirtualPath": "LCCTUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACSPerfMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "ACSPerfPassenger.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACSPerfPcs.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACSPerfTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACSPerfTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACSPerfWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "POST_GRE",
+        "UiBaseUrl": "https://postgreui.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "postgresqltestapi.azurewebsites.net" },
+          { "Module": "ContentMgt", "RoutePrefix": "api_contentmgt", "ApiHost": "postgresqltest-contentmgmt.azurewebsites.net", "UiVirtualPath": "contentmgmtUI" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "postgresqltest-edi.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "postgresqltest-hf.azurewebsites.net" },
+          { "Module": "Hospitality", "RoutePrefix": "api_hospitality", "ApiHost": "postgresqltest-hospitality.azurewebsites.net", "UiVirtualPath": "hospitalityUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "postgresqltest-master.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "postgresqltest-Passenger.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "postgresqltest-pcs.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "postgresqltest-tariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "postgresqltest-workflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "POST_GRE_VAPT",
+        "UiBaseUrl": "https://postgresvaptui.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "postgresqlvaptapi.azurewebsites.net" },
+          { "Module": "ContentMgt", "RoutePrefix": "api_contentmgt", "ApiHost": "postgresqlvapt-contentmgmt.azurewebsites.net", "UiVirtualPath": "ContentManagementUI" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "postgresqlvapt-edi.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "postgresqlvapt-hf.azurewebsites.net" },
+          { "Module": "Hospitality", "RoutePrefix": "api_hospitality", "ApiHost": "postgresqlvapt-hospitality.azurewebsites.net", "UiVirtualPath": "hospitalityUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "postgresqlvapt-master.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "postgresqlvapt-Passenger.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "postgresqlvapt-pcs.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "postgresqlvapt-tariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "postgresqlvapt-workflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "UAT_CES",
+        "UiBaseUrl": "https://WFSCESUATUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "WFSCESUATAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "WFSCESUATEDInotification.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2USAUATExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "WFSCESUATHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2USAUATImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "WFSCESUATMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "WFSCESUATPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "WFSCESUATTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "WFSCESUATTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "WFSCESUATWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "UAT_ACS",
+        "UiBaseUrl": "https://ACS2EURUATUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2EURUATAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2EURUATMessagebroker.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2EURUATExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2EURUATHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2EURUATImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2EURUATMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACS2EURUATPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2EURUATTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2EURUATTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2EURUATWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "UAT_ACS_IGA",
+        "UiBaseUrl": "https://ACS2EURUATIGAUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2EURUATIGAAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2EURUATIGAMessagebroker.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2EURUATIGAExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2EURUATIGAHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2EURUATIGAImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2EURUATIGAMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACS2EURUATIGAPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2EURUATIGATariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2EURUATIGATSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2EURUATIGAWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "UAT_MPA",
+        "UiBaseUrl": "https://MPAUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "MPAMaster.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "MPAPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "MPATariff.azurewebsites.net" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "MPATSM.azurewebsites.net", "UiVirtualPath": "TSMUI" }
+        ]
+      },
+      {
+        "Name": "PROD_BUD",
+        "UiBaseUrl": "https://ACS2BUDUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2BUDAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2BUDMessagebroker.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2BUDExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2BUDHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2BUDImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2BUDMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACS2BUDPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2BUDTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2BUDTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2BUDWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "PROD_CES",
+        "UiBaseUrl": "https://ACS2USAUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2USAAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2USAEDI-Notification.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2USAExport.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2USAHangfire.azurewebsites.net" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2USAMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2USATariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2USATSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2USAWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "PROD_ACS",
+        "UiBaseUrl": "https://ACS2EURUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2EURAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2EUREDI-Notification.azurewebsites.net", "UiVirtualPath": "EDI-NotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2EURExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2EURHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2EURImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "ACS2EURPCS.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2EURTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2EURTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2EURWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "PROD_BOG",
+        "UiBaseUrl": "https://ACS2BOGUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "ACS2BOGAPIgateway.azurewebsites.net" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "ACS2BOGEDI-Notification.azurewebsites.net", "UiVirtualPath": "EDI-NotificationUI" },
+          { "Module": "Export", "RoutePrefix": "api_export", "ApiHost": "ACS2BOGExports.azurewebsites.net", "UiVirtualPath": "ExportUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "ACS2BOGHangfire.azurewebsites.net" },
+          { "Module": "Import", "RoutePrefix": "api_import", "ApiHost": "ACS2BOGImports.azurewebsites.net", "UiVirtualPath": "ImportUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "ACS2BOGMasters.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "ACS2BOGTariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "TSM", "RoutePrefix": "api_tsm", "ApiHost": "ACS2BOGTSM.azurewebsites.net", "UiVirtualPath": "TSMUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "ACS2BOGWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      },
+      {
+        "Name": "PROD_LPMS",
+        "UiBaseUrl": "https://LPMSPRODUI.azurewebsites.net",
+        "Targets": [
+          { "Module": "Shell-UI", "UiVirtualPath": "/" },
+          { "Module": "APi_Gateway", "RoutePrefix": "api", "ApiHost": "LPMSPRODAPI.azurewebsites.net" },
+          { "Module": "ContentMgt", "RoutePrefix": "api_contentmgt", "ApiHost": "LPMSPRODAPIContentMgmt.azurewebsites.net", "UiVirtualPath": "ContentmgmtUI" },
+          { "Module": "EDI", "RoutePrefix": "api_edinotofication", "ApiHost": "LPMSPRODAPIEDI.azurewebsites.net", "UiVirtualPath": "EDINotificationUI" },
+          { "Module": "Hangfire", "RoutePrefix": "api_hangfire", "ApiHost": "LPMSPRODAPIhangfire.azurewebsites.net" },
+          { "Module": "Hospitality", "RoutePrefix": "api_hospitality", "ApiHost": "LPMSPRODAPIHospitality.azurewebsites.net", "UiVirtualPath": "HospitalityUI" },
+          { "Module": "Master", "RoutePrefix": "api_master", "ApiHost": "LPMSPRODAPImaster.azurewebsites.net", "UiVirtualPath": "MastersUI" },
+          { "Module": "Passenger", "RoutePrefix": "api_passenger", "ApiHost": "LPMSPRODAPIPassenger.azurewebsites.net", "UiVirtualPath": "PassengerUI" },
+          { "Module": "PCS", "RoutePrefix": "api_pcs", "ApiHost": "LPMSPRODAPIpcs.azurewebsites.net", "UiVirtualPath": "PCSUI" },
+          { "Module": "Tariff", "RoutePrefix": "api_tariff", "ApiHost": "LPMSPRODAPItariff.azurewebsites.net", "UiVirtualPath": "TariffUI" },
+          { "Module": "Workflow", "RoutePrefix": "api_workflow", "ApiHost": "LPMSPRODAPIWorkflow.azurewebsites.net", "UiVirtualPath": "WorkflowUI" }
+        ]
+      }
+    ]
+  }
+}

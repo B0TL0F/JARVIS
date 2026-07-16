@@ -1,0 +1,199 @@
+/* App shell — ported 1:1 from the reference "agentic-os-personal" header
+   and pill tabs-nav (F:\Claude_Test\PRoject\Theme\agentic-os-personal). */
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+}
+
+:host-context(body.hud-mode) .app {
+  max-width: 1640px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ff2b2b 0%, #c20f0f 50%, #7a0606 100%);
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  color: #fff;
+  box-shadow: 0 4px 20px var(--accent-glow);
+  flex-shrink: 0;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  font-family: var(--font);
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  font-family: var(--font);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.header-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 12px var(--accent-soft);
+}
+
+.status-pill {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font);
+}
+.status-pill.admin {
+  color: #fff;
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+}
+.status-pill.admin::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent2);
+  margin-right: 7px;
+  box-shadow: 0 0 8px var(--accent2);
+  vertical-align: middle;
+}
+.status-pill.developer {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.3);
+  background: rgba(167, 139, 250, 0.1);
+}
+
+/* Nav menu — a hamburger toggle in the header's top-right corner that opens
+   a dropdown containing the tab list, instead of a permanent full-width bar. */
+.nav-menu {
+  position: relative;
+}
+
+.burger {
+  padding: 10px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 38px;
+  height: 38px;
+}
+.burger-bar {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text-secondary);
+  transition: var(--transition);
+}
+.burger:hover .burger-bar,
+.burger.active .burger-bar {
+  background: var(--accent-hover);
+}
+.burger.active .burger-bar:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.burger.active .burger-bar:nth-child(2) { opacity: 0; }
+.burger.active .burger-bar:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  padding: 8px;
+  background: var(--surface-raised);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  animation: jv-fade-in var(--dur-fast) var(--ease-standard) both;
+}
+
+.navtab {
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.navtab.active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.navtab:hover:not(.active) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.viewport {
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .app { padding: 20px 16px 40px; }
+  header { gap: 12px; }
+  .header-actions { width: 100%; justify-content: space-between; }
+}

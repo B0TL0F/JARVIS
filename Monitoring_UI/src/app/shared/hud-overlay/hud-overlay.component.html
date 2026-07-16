@@ -1,0 +1,20 @@
+<div class="hud" aria-hidden="true">
+  <div class="dial dial--big">
+    <div class="ring ring--outer">
+      <div class="tick" *ngFor="let a of ticks" [style.transform]="'rotate(' + a + 'deg)'"></div>
+    </div>
+    <div class="ring ring--mid"></div>
+    <div class="sweep"></div>
+    <div class="center-dot"></div>
+  </div>
+
+  <div class="dial dial--small">
+    <div class="ring ring--outer">
+      <div class="tick" *ngFor="let a of ticksSparse" [style.transform]="'rotate(' + a + 'deg)'"></div>
+    </div>
+    <div class="ring ring--mid"></div>
+    <div class="sweep sweep--slow"></div>
+  </div>
+
+  <div class="scanline"></div>
+</div>

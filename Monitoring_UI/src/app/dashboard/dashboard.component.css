@@ -1,0 +1,426 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  animation: jv-fade-up var(--dur-entrance) var(--ease-standard) both;
+}
+
+.board {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+:host-context(body.hud-mode) .board {
+  max-width: none;
+}
+
+/* ── Page head (replaces the old hero card) ──────────────────────────────── */
+
+.board-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.headline {
+  font-family: var(--font);
+  text-transform: none;
+  font-weight: 700;
+  font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+  letter-spacing: -0.01em;
+  margin: 0;
+  transition: color 400ms ease;
+}
+
+.headline.state-up { color: var(--signal-up); }
+.headline.state-degraded { color: var(--signal-caution); }
+.headline.state-down { color: var(--signal-down); }
+
+/* Word-reveal mask: each word is a fixed-height overflow-hidden window that
+   its inner span rises up through — this is set via JS (AnimationService),
+   these rules just keep the layout correct once split. */
+.headline ::ng-deep .gsap-word { display: inline-block; overflow: hidden; vertical-align: top; }
+.headline ::ng-deep .gsap-word-inner { display: inline-block; will-change: transform; }
+
+.sub {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.header-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 12px var(--accent-soft);
+}
+
+.banner {
+  background: rgba(255, 51, 102, 0.1);
+  border: 1px solid rgba(255, 51, 102, 0.35);
+  color: #ff6688;
+  padding: 10px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+}
+
+.env-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+  /* ~30 environment buttons wrapping on a narrow screen pushes everything
+     else below the fold — scroll horizontally in one row instead. */
+  .env-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .env-tab {
+    flex-shrink: 0;
+  }
+}
+
+.env-tab {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.env-tab:hover {
+  border-color: var(--hairline-strong);
+  color: var(--text);
+}
+
+.env-tab.active {
+  background: var(--beacon);
+  border-color: var(--beacon);
+  color: #14161a;
+  font-weight: 600;
+}
+
+.loading {
+  color: var(--text-dim);
+  font-family: var(--font-data);
+  padding: 40px 0;
+  text-align: center;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-list .skel-row {
+  height: 52px;
+  margin-bottom: 0;
+  border-radius: 4px;
+  opacity: 0;
+  animation: jv-fade-in var(--dur-fast) var(--ease-standard) both, jv-shimmer 1.6s ease-in-out infinite;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background var(--dur-base) var(--ease-standard);
+}
+
+.dot.up { background: var(--signal-up); box-shadow: 0 0 6px rgba(0, 255, 136, 0.5); }
+
+.dot.degraded {
+  background: var(--signal-caution);
+  --pulse-color: rgba(255, 170, 0, 0.5);
+  animation: jv-pulse-ring 1.8s ease-in-out infinite;
+}
+
+.dot.down {
+  background: var(--signal-down);
+  --pulse-color: rgba(255, 51, 102, 0.5);
+  animation: jv-pulse-ring 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot.down, .dot.degraded { animation: none; }
+}
+
+/* HUD dashboard — a command-center grid centered on the spinning globe,
+   ported from the reference design's hud-grid. This is now the ONLY
+   dashboard view (no manifest table, no signals/content tiles) — just
+   Fleet vitals and Attention flanking the globe, dead center. */
+.hud-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.6fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  min-height: 560px;
+  animation: jv-fade-in var(--dur-base) var(--ease-standard) both;
+}
+
+.hud-panel {
+  position: relative;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Corner-accent brackets — CSS border corners, not clip-path, matching the
+   reference's hud-panel::before/::after treatment exactly. */
+.hud-panel::before,
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-color: var(--accent);
+  border-style: solid;
+  opacity: 0.7;
+}
+.hud-panel::before { top: 7px; left: 7px; border-width: 1px 0 0 1px; }
+.hud-panel::after { bottom: 7px; right: 7px; border-width: 0 1px 1px 0; }
+
+.hud-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.hud-panel-title {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-hover);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hud-panel-title::before {
+  content: '\25B8';
+  color: var(--accent);
+  font-size: 0.7rem;
+}
+
+.vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.vital-stat {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+.vital-stat .lbl {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.vital-stat .val { font-size: 1.32rem; font-weight: 700; margin-top: 4px; }
+.vital-stat.up .val { color: var(--signal-up); }
+.vital-stat.degraded .val { color: var(--signal-caution); }
+
+.vital-down-line {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+.vital-down-line b { color: var(--signal-down); font-size: 1rem; }
+
+.hud-attention { overflow-y: auto; }
+
+.hud-module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hud-module-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-left: 2px solid transparent;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.hud-module-row.down { border-left-color: var(--signal-down); }
+.hud-module-row.degraded { border-left-color: var(--signal-caution); }
+
+.hud-module-name {
+  flex: 1;
+  font-family: var(--font);
+  font-weight: 600;
+}
+
+.hud-module-uptime {
+  color: var(--muted);
+}
+
+.hud-empty {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 8px 0;
+}
+
+/* ── Globe / assistant stage ──────────────────────────────────────────────── */
+
+.globe-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 560px;
+  padding: 24px;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.globe-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1;
+  flex: none;
+  margin: 0 auto;
+}
+
+.globe-canvas-wrap app-hud-globe {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.globe-ring {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 78%;
+  aspect-ratio: 1;
+  border: 1px dashed rgba(255, 70, 70, 0.25);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: hud-spin 36s linear infinite;
+}
+.globe-ring.r2 {
+  width: 92%;
+  border-style: solid;
+  border-color: rgba(255, 70, 70, 0.1);
+  animation-duration: 60s;
+  animation-direction: reverse;
+}
+@keyframes hud-spin { to { transform: rotate(360deg); } }
+
+.assistant-title {
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-align: center;
+}
+.assistant-hint {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.assistant-status {
+  margin-top: 6px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  min-height: 18px;
+}
+.assistant-status.down { color: var(--signal-down); }
+.assistant-status.degraded { color: var(--signal-caution); }
+.assistant-status.up { color: var(--signal-up); }
+
+@media (prefers-reduced-motion: reduce) {
+  .globe-ring { animation: none; }
+}
+
+@media (max-width: 1180px) {
+  .hud-grid {
+    grid-template-columns: 1fr 1fr;
+    min-height: 0;
+  }
+  .globe-stage {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .hud-grid {
+    grid-template-columns: 1fr;
+  }
+}

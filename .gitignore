@@ -1,0 +1,14 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Ocelot environment configs — only Dev is committed here for testing; every
+# other real environment's gateway config is intentionally excluded from
+# this repo.
+ocelot/*.json
+ocelot/*.JSON
+!ocelot/Ocelot.Dev.json
+
+# System files
+.DS_Store
+Thumbs.db

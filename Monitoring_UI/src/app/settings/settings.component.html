@@ -1,0 +1,83 @@
+<div class="settings">
+  <h2>Settings</h2>
+
+  <div class="banner err" *ngIf="error">{{ error }}</div>
+
+  <div class="skeleton-list" *ngIf="loading">
+    <div class="skel-card" *ngFor="let i of [0,1]" [style.animation-delay.ms]="i * 60">
+      <div class="skel skel-title"></div>
+      <div class="skel skel-row"></div>
+      <div class="skel skel-row"></div>
+    </div>
+  </div>
+
+  <ng-container *ngIf="!loading">
+  <div class="settings-grid">
+    <!-- Azure DevOps -->
+    <section class="card jv-stagger">
+      <h3>Azure DevOps</h3>
+      <p class="hint">Powers the Pipelines dashboard. Values saved here override the environment variables.</p>
+
+      <form (ngSubmit)="saveAzure()">
+        <label>
+          <span>Organization</span>
+          <input type="text" name="org" [(ngModel)]="org" placeholder="e.g. kalelogistics" autocomplete="off" />
+        </label>
+        <label>
+          <span>Project</span>
+          <input type="text" name="project" [(ngModel)]="project" placeholder="e.g. Community" autocomplete="off" />
+        </label>
+        <label>
+          <span>API version</span>
+          <input type="text" name="apiVersion" [(ngModel)]="apiVersion" placeholder="7.1" autocomplete="off" />
+        </label>
+        <label>
+          <span>Personal Access Token (PAT)
+            <em class="pat-state" [class.on]="patConfigured">{{ patConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="pat" [(ngModel)]="pat"
+                 [placeholder]="patConfigured ? '•••••••• (leave blank to keep)' : 'Paste PAT'" autocomplete="new-password" />
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingAzure">{{ savingAzure ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="azureSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Ocelot importer -->
+    <section class="card jv-stagger" style="animation-delay: 60ms">
+      <h3>Ocelot auto-importer</h3>
+      <p class="hint">
+        Drop Ocelot gateway JSON files into <code>{{ ocelotDir }}</code>, then re-import.
+        Each file becomes an environment (named from the filename). The file-watcher is unreliable
+        on bind mounts, so use this button after adding files.
+      </p>
+
+      <div class="actions">
+        <button type="button" (click)="reimport(false)" [disabled]="reimporting">
+          {{ reimporting ? 'Importing…' : 'Import new files' }}
+        </button>
+        <button type="button" class="danger" (click)="reimport(true)" [disabled]="reimporting">
+          Force full re-import
+        </button>
+      </div>
+
+      <div class="result jv-fade-up-el" *ngIf="reimportResult as r">
+        <div *ngIf="!r.imported" class="banner err">{{ r.msg }}</div>
+        <ng-container *ngIf="r.imported">
+          <p class="hint">Scanned {{ r.filesScanned }} file(s). Imported environments:</p>
+          <table class="grid">
+            <thead><tr><th>Environment</th><th>Targets</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let e of r.environments"><td>{{ e.environment }}</td><td>{{ e.count }}</td></tr>
+              <tr *ngIf="!r.environments.length"><td colspan="2" class="muted">No environments imported.</td></tr>
+            </tbody>
+          </table>
+        </ng-container>
+      </div>
+    </section>
+  </div>
+  </ng-container>
+</div>

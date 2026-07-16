@@ -1,0 +1,106 @@
+<div class="targets card card-main">
+  <div class="main-head">
+    <h3>Manage targets</h3>
+    <button class="header-btn add" (click)="startCreate()">+ Add target</button>
+  </div>
+
+  <p class="hint">
+    Edit or delete any monitored target, grouped by environment — including the static seeds from
+    <code>config/targets.json</code>. Editing a config-seeded target creates an override that takes
+    precedence over the config file from then on; deleting that override reverts it to the config default.
+    Changes take effect on the next polling cycle.
+  </p>
+
+  <div class="toolbar">
+    <input class="search" type="search" [(ngModel)]="search" placeholder="Filter by environment or module…" />
+    <div class="toolbar-actions">
+      <button class="header-btn sm" (click)="expandAll(true)">Expand all</button>
+      <button class="header-btn sm" (click)="expandAll(false)">Collapse all</button>
+    </div>
+  </div>
+
+  <div class="banner err" *ngIf="error">{{ error }}</div>
+
+  <div class="skeleton-list" *ngIf="loading">
+    <div class="skel-group" *ngFor="let i of [0,1,2]" [style.animation-delay.ms]="i * 60">
+      <div class="skel skel-title"></div>
+      <div class="skel skel-row"></div>
+      <div class="skel skel-row"></div>
+    </div>
+  </div>
+
+  <div class="groups" *ngIf="!loading">
+    <div class="group source-item" *ngFor="let g of filteredGroups; let gi = index; trackBy: trackByEnv"
+         [style.animation-delay.ms]="gi * 40">
+      <button class="group-head" (click)="toggle(g)" [attr.aria-expanded]="g.expanded">
+        <span class="chevron" [class.open]="g.expanded">›</span>
+        <span class="env-name">{{ g.environment }}</span>
+        <span class="env-count chip">{{ g.targets.length }} target{{ g.targets.length === 1 ? '' : 's' }}</span>
+        <span class="spacer"></span>
+        <span class="quick-add" (click)="$event.stopPropagation(); startCreate(g.environment)">+ Add here</span>
+        <span class="del-env" (click)="$event.stopPropagation(); removeEnvironment(g)">Delete environment</span>
+      </button>
+
+      <div class="group-body" [class.open]="g.expanded">
+        <div class="group-body-inner">
+          <table class="grid-table">
+            <thead>
+              <tr><th>Module</th><th>Health check</th><th>Origin</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of g.targets; trackBy: trackById">
+                <td>{{ t.module }}</td>
+                <td class="mono healthcheck" [title]="t.healthCheckUrl || 'No API host/route configured'">
+                  {{ t.healthCheckUrl || '—' }}
+                </td>
+                <td><span class="chip origin" [ngClass]="t.origin">{{ t.origin }}</span></td>
+                <td class="right">
+                  <button class="header-btn sm" (click)="startEdit(t)">Edit</button>
+                  <button class="header-btn sm del" *ngIf="t.id !== null" (click)="remove(t)">Delete</button>
+                  <span class="chip muted-chip" *ngIf="t.id === null" title="Defined in config/targets.json — edit to override">config-defined</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="!filteredGroups.length">
+      <ng-container *ngIf="search">No targets match "{{ search }}".</ng-container>
+      <ng-container *ngIf="!search">No managed targets yet. Add one, or import via Settings.</ng-container>
+    </div>
+  </div>
+</div>
+
+<!-- Editor — a modal popup. Kept as a SIBLING of .targets (not nested inside
+     it) because .targets has an entrance animation with fill-mode:both,
+     which permanently leaves an identity `transform` on it once settled —
+     and any transform on an ancestor turns `position:fixed` into "fixed
+     relative to that ancestor" instead of the viewport, breaking centering. -->
+<div class="modal-backdrop" *ngIf="showForm" (click)="cancel()">
+  <div class="editor" (click)="$event.stopPropagation()">
+    <h3>{{ editingIsOverride ? 'Override config target' : (editingId === null ? 'New target' : 'Edit target') }}</h3>
+    <p class="hint" *ngIf="editingIsOverride">
+      This target is currently defined in <code>config/targets.json</code>. Saving creates a database
+      override that takes precedence over the config file for this environment/module.
+    </p>
+    <form (ngSubmit)="save()">
+      <div class="grid2">
+        <label><span>Environment *</span>
+          <input name="env" [(ngModel)]="form.environment" placeholder="e.g. QA" autocomplete="off" /></label>
+        <label><span>Module *</span>
+          <input name="mod" [(ngModel)]="form.module" placeholder="e.g. LOGIN" autocomplete="off" /></label>
+        <label><span>API host</span>
+          <input name="host" [(ngModel)]="form.apiHost" placeholder="e.g. acs2devlogin.azurewebsites.net" autocomplete="off" /></label>
+        <label><span>Route prefix</span>
+          <input name="rp" [(ngModel)]="form.routePrefix" placeholder="e.g. api_login" autocomplete="off" /></label>
+      </div>
+      <p class="hint">API health hits <code>https://&lt;host&gt;/&lt;prefix&gt;/verifyapi/check</code>. UI checks aren't monitored — a plain HTTP request can't tell whether the app actually works, only that the server responds.</p>
+      <div class="actions">
+        <button type="submit" class="header-btn primary" [disabled]="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+        <button type="button" class="header-btn" (click)="cancel()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
