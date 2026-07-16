@@ -39,8 +39,9 @@ export class LoginComponent {
 
     // Kick off the intro FIRST, then flip auth. The intro overlay is
     // body-appended (bypassing Angular's CD) so it can't be prematurely
-    // unmounted by unrelated change detection cycles.
-    const introDone = this.intro.play();
+    // unmounted by unrelated change detection cycles. Passing the operator
+    // name gives JARVIS a personal greeting during the ACCESS GRANTED beat.
+    const introDone = this.intro.play({ operator: this.username });
     this.auth.commit(result.role!);
 
     await introDone;

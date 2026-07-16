@@ -13,6 +13,18 @@
       </div>
       <div class="header-actions">
         <button class="header-btn back-hud" *ngIf="view !== 'dashboard'" (click)="go('dashboard')">&larr; Dashboard</button>
+        <button
+          class="header-btn voice-btn"
+          [class.muted]="voiceMuted"
+          (click)="toggleVoice()"
+          [attr.aria-label]="voiceMuted ? 'Unmute JARVIS voice' : 'Mute JARVIS voice'"
+          [attr.title]="voiceMuted ? 'JARVIS voice muted — click to enable' : 'JARVIS voice on — click to mute'">
+          <span class="voice-icon">
+            <span class="voice-wave"></span>
+            <span class="voice-wave"></span>
+            <span class="voice-wave"></span>
+          </span>
+        </button>
         <span class="status-pill" [ngClass]="auth.role()">{{ auth.role() }}</span>
         <button class="header-btn" (click)="logout()">Sign out</button>
 

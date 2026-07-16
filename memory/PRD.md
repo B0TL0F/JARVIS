@@ -44,6 +44,21 @@ User confirmed: "go all out" — full-cinematic Iron-Man-style HUD upgrade.
 - **Login page HUD frame** — 4 corner brackets + top/bottom system tags around the whole login viewport
 - Updated header `h1` to Orbitron with tracked-out uppercase treatment
 - Bumped production initial bundle budget to 1.5MB to accommodate the intro overlay + fonts
+
+### v3 additions — JARVIS actually speaks (this iteration)
+- **`VoiceService`** (`services/voice.service.ts`) wraps the browser Web Speech API:
+  - Picks best available English male voice (British preferred: Google UK English Male → Microsoft George/Ryan → Daniel/Oliver/Arthur on Apple → any en-GB → any en with "male" → any en → any voice)
+  - Rate 0.94, pitch 0.85 by default — measured, slightly authoritative delivery
+  - Cancels any in-flight utterance before speaking a new one (never overlaps)
+  - Waits for `onvoiceschanged` before speaking (voices load async on some browsers)
+  - Preference persisted in `localStorage['jarvis.voice.muted']`
+  - Fails silently if `speechSynthesis` is unavailable
+- **Login intro voice line** — `LoginIntroService.play({ operator })` fires an `onStart` callback on the ACCESS GRANTED beat that speaks:
+  - `"Welcome back, Tony. All systems nominal."` (for named users like `tony`, `sarah.chen` → "Sarah")
+  - `"Welcome back. All systems nominal."` (for service-account IDs: admin, root, devops, operator, system — first-name greeting suppressed to avoid saying "welcome back devops")
+- **Logout voice line** — `"Session terminated. Goodbye."`
+- **Voice toggle button in header** — animated equalizer bars (3 red bars pulsing) when unmuted, collapse flat with diagonal strikethrough when muted. Tooltip toggles between "JARVIS voice on — click to mute" / "JARVIS voice muted — click to enable". Unmuting speaks a quick "Voice online." confirmation so users know it took.
+- Verified in headless Chromium: SpeechSynthesis is called, mute button toggles state, preference persists to localStorage. Actual audio plays on real desktops with OS voices installed.
 1. **Boot splash → cinematic** (`shared/jarvis-boot/*`):
    - Multi-ring choreography (5 concentric rings, dashed + solid + dotted)
    - Arc-reactor pulsing core with radial glow halo

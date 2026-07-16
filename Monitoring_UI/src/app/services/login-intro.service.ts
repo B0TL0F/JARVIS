@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import gsap from 'gsap';
+import { VoiceService } from './voice.service';
 
 // Orchestrates the cinematic login → dashboard sequence by imperatively
 // mounting a full-screen HUD overlay to <body>. Bypasses Angular's *ngIf +
@@ -7,11 +8,18 @@ import gsap from 'gsap';
 // unmounted by unrelated CD cycles (e.g. status polling on the dashboard).
 // Timeline: globe materialises → burst peak → ACCESS GRANTED pulse →
 // contract & drift into the dashboard globe slot → fade.
+// If browser Speech Synthesis is available AND the user hasn't muted,
+// JARVIS speaks "Welcome back, <Operator>. All systems nominal." timed to
+// the ACCESS GRANTED moment.
 @Injectable({ providedIn: 'root' })
 export class LoginIntroService {
   private overlay: HTMLElement | null = null;
 
-  play(durationMs = 2400): Promise<void> {
+  constructor(private voice: VoiceService) {}
+
+  play(opts: { operator?: string; durationMs?: number } = {}): Promise<void> {
+    const durationMs = opts.durationMs ?? 2400;
+    const operator = (opts.operator ?? '').trim();
     if (this.overlay) return Promise.resolve();
     if (typeof document === 'undefined') return Promise.resolve();
 
@@ -108,7 +116,19 @@ export class LoginIntroService {
       tl.fromTo(
         label,
         { opacity: 0, y: 14, letterSpacing: '1em' },
-        { opacity: 1, y: 0, letterSpacing: '0.5em', duration: 0.6, ease: 'power3.out' },
+        {
+          opacity: 1, y: 0, letterSpacing: '0.5em', duration: 0.6, ease: 'power3.out',
+          onStart: () => {
+            // Fire JARVIS's greeting the instant the label starts appearing.
+            // Fire-and-forget — the visual keeps its beat even if speech is
+            // unavailable/blocked/muted.
+            const name = this.friendlyName(operator);
+            const greeting = name
+              ? `Welcome back, ${name}. All systems nominal.`
+              : 'Welcome back. All systems nominal.';
+            this.voice.speak(greeting);
+          }
+        },
         0.75
       );
       tl.fromTo(
@@ -135,5 +155,16 @@ export class LoginIntroService {
       const totalNow = tl.duration() * 1000;
       if (totalNow < durationMs) tl.to({}, { duration: (durationMs - totalNow) / 1000 });
     });
+  }
+
+  // Turn a raw operator id like "devops" or "sarah.chen" into something a
+  // TTS engine can pronounce naturally. Keeps first-name-only, title-cases,
+  // and gracefully returns "" if the id looks like a role/service account.
+  private friendlyName(raw: string): string {
+    if (!raw) return '';
+    const clean = raw.replace(/[._-]+/g, ' ').trim().split(' ')[0];
+    if (!clean) return '';
+    if (['admin', 'root', 'devops', 'operator', 'system'].includes(clean.toLowerCase())) return '';
+    return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
   }
 }

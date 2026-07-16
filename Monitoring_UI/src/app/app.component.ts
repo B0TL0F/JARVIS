@@ -9,6 +9,7 @@ import { SettingsComponent } from './settings/settings.component';
 import { TargetsComponent } from './targets/targets.component';
 import { AuthService } from './services/auth.service';
 import { ViewTransitionService } from './services/view-transition.service';
+import { VoiceService } from './services/voice.service';
 import { MagneticDirective } from './shared/magnetic.directive';
 import { CustomCursorComponent } from './shared/custom-cursor/custom-cursor.component';
 import { JarvisBootComponent } from './shared/jarvis-boot/jarvis-boot.component';
@@ -52,11 +53,22 @@ export class AppComponent implements AfterViewChecked {
 
   constructor(
     public auth: AuthService,
+    public voice: VoiceService,
     private transitions: ViewTransitionService,
     private renderer: Renderer2,
     private hostRef: ElementRef<HTMLElement>
   ) {
+    this.voiceMuted = this.voice.isMuted();
     this.syncHudModeClass();
+  }
+
+  voiceMuted = false;
+
+  toggleVoice(): void {
+    this.voiceMuted = !this.voiceMuted;
+    this.voice.setMuted(this.voiceMuted);
+    // If unmuting, give a tiny audible confirmation so the user knows it took.
+    if (!this.voiceMuted) this.voice.speak('Voice online.', { rate: 1.0, pitch: 0.9 });
   }
 
   toggleMenu(): void {
@@ -134,6 +146,7 @@ export class AppComponent implements AfterViewChecked {
   }
 
   logout(): void {
+    this.voice.speak('Session terminated. Goodbye.', { rate: 0.95, pitch: 0.85 });
     this.view = 'dashboard';
     this.auth.logout();
   }
