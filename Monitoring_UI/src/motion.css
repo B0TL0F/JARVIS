@@ -1,16 +1,18 @@
-/* Jarvis — shared motion system. One vocabulary of transitions/keyframes used
-   across every view, kept deliberately quiet: entrances settle in ~0.4s with a
-   slight upward drift, nothing bounces or overshoots. Respects reduced-motion. */
+/* Jarvis — shared motion system. HUD-flavored micro-interactions used across
+   every view: entrance drifts, shimmers, pulses, ripples, and the full-screen
+   iris/scanline transition overlay used between routes. Respects reduced-motion
+   without ever stranding an element on opacity: 0. */
 
 :root {
   --ease-standard: cubic-bezier(0.2, 0.7, 0.3, 1);
-  --dur-fast: 120ms;
-  --dur-base: 220ms;
-  --dur-entrance: 420ms;
+  --ease-hud: cubic-bezier(0.65, 0.05, 0.35, 1);
+  --dur-fast: 140ms;
+  --dur-base: 260ms;
+  --dur-entrance: 520ms;
 }
 
 @keyframes jv-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -25,8 +27,18 @@
 }
 
 @keyframes jv-pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(255, 93, 93, 0.5)); }
-  50%      { box-shadow: 0 0 0 4px transparent; }
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color, rgba(255, 93, 93, 0.55)); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+@keyframes jv-glow-breath {
+  0%, 100% { box-shadow: 0 0 6px var(--accent-soft), 0 0 12px var(--accent-soft); }
+  50%      { box-shadow: 0 0 14px var(--accent-glow), 0 0 26px var(--accent-soft); }
+}
+
+@keyframes jv-scanline {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100vh); }
 }
 
 /* Entrance: applied to :host of each top-level view so it plays once per
@@ -35,13 +47,11 @@
   animation: jv-fade-up var(--dur-entrance) var(--ease-standard) both;
 }
 
-/* Per-item stagger: pair with [style.animation-delay.ms]="i * N" in *ngFor. */
 .jv-stagger {
   opacity: 0;
   animation: jv-fade-up var(--dur-base) var(--ease-standard) both;
 }
 
-/* Skeleton loading blocks — shimmer replaces plain "Loading…" text. */
 .skel {
   border-radius: 4px;
   background: linear-gradient(
@@ -52,28 +62,133 @@
   );
   background-size: 200% 100%;
   animation: jv-shimmer 1.6s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+.skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 43, 43, 0.14), transparent);
+  animation: jv-shimmer 2.4s linear infinite reverse;
+  pointer-events: none;
 }
 
 .skel-title { height: 14px; width: 40%; margin-bottom: 10px; }
 .skel-row { height: 40px; width: 100%; margin-bottom: 6px; }
 
-/* Status dots: urgency-driven motion only — steady "up" stays calm, degraded
-   and down pulse to draw the eye. Uses --pulse-color set per state in component CSS. */
 .jv-pulse {
   animation: jv-pulse-ring 1.6s ease-in-out infinite;
 }
 
-/* IMPORTANT: .jv-enter/.jv-stagger start from opacity:0 and rely on the animation's
-   "both" fill-mode to land on opacity:1 — that's the only rule that ever sets
-   opacity back to 1. Under reduced-motion we must NOT disable the animation outright
-   (animation: none would strand the element at its opacity:0 starting keyframe,
-   invisible forever with zero console errors). Instead let the global
-   animation-duration:0.001ms override in styles.css shrink it to instantaneous while
-   the fill-mode still resolves the element to its visible end state.
-   Only decorative infinite loops (shimmer, pulse rings) — which don't gate an
-   element's base visibility — are safe to fully disable here. */
+/* Ripple container — buttons with .jv-ripple pick this up. Individual ripple
+   nodes are injected via JS on click. */
+.jv-ripple {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.jv-ripple > .jv-ripple-node {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle,
+    rgba(255, 90, 90, 0.55) 0%,
+    rgba(255, 43, 43, 0.25) 45%,
+    transparent 70%);
+  pointer-events: none;
+  animation: jv-ripple-anim 620ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  mix-blend-mode: screen;
+  z-index: 0;
+}
+@keyframes jv-ripple-anim {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  to   { transform: translate(-50%, -50%) scale(6); opacity: 0; }
+}
+
+/* Iris/scanline transition overlay — appended to <body> by ViewTransitionService
+   between route changes. */
+#jv-iris-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  pointer-events: none;
+  opacity: 0;
+}
+#jv-iris-overlay.run {
+  animation: iris-fade 620ms ease-out both;
+}
+@keyframes iris-fade {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+#jv-iris-overlay .iris-scan {
+  position: absolute; left: 0; right: 0;
+  top: 0;
+  height: 30vh;
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    rgba(255, 43, 43, 0.10) 40%,
+    rgba(255, 43, 43, 0.45) 55%,
+    rgba(255, 255, 255, 0.85) 60%,
+    rgba(255, 43, 43, 0.45) 65%,
+    rgba(255, 43, 43, 0.10) 80%,
+    transparent 100%);
+  mix-blend-mode: screen;
+  filter: blur(0.5px);
+}
+#jv-iris-overlay.run .iris-scan {
+  animation: iris-sweep 620ms cubic-bezier(0.65, 0.05, 0.35, 1) both;
+}
+@keyframes iris-sweep {
+  from { transform: translateY(-40vh); }
+  to   { transform: translateY(110vh); }
+}
+#jv-iris-overlay .iris-corner {
+  position: absolute;
+  width: 28px; height: 28px;
+  border-color: var(--accent, #ff2b2b);
+  border-style: solid;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(255, 43, 43, 0.7));
+}
+#jv-iris-overlay .iris-corner.tl { top: 24px; left: 24px; border-width: 2px 0 0 2px; }
+#jv-iris-overlay .iris-corner.tr { top: 24px; right: 24px; border-width: 2px 2px 0 0; }
+#jv-iris-overlay .iris-corner.bl { bottom: 24px; left: 24px; border-width: 0 0 2px 2px; }
+#jv-iris-overlay .iris-corner.br { bottom: 24px; right: 24px; border-width: 0 2px 2px 0; }
+#jv-iris-overlay.run .iris-corner {
+  animation: iris-corner-in 620ms cubic-bezier(0.65, 0.05, 0.35, 1) both;
+}
+@keyframes iris-corner-in {
+  0%   { opacity: 0; transform: scale(0.6); }
+  30%  { opacity: 1; transform: scale(1); }
+  85%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+#jv-iris-overlay .iris-label {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--mono, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  color: var(--accent, #ff2b2b);
+  text-shadow: 0 0 12px rgba(255, 43, 43, 0.7);
+  opacity: 0;
+}
+#jv-iris-overlay.run .iris-label {
+  animation: iris-label 620ms ease-out both;
+}
+@keyframes iris-label {
+  0%, 100% { opacity: 0; letter-spacing: 0.4em; }
+  40%, 60% { opacity: 1; letter-spacing: 0.28em; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .skel, .jv-pulse {
+  .skel, .jv-pulse, #jv-iris-overlay {
     animation: none !important;
   }
+  #jv-iris-overlay .iris-scan { display: none; }
 }

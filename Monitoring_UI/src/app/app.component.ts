@@ -47,6 +47,9 @@ export class AppComponent implements AfterViewChecked {
   @ViewChild('viewport') viewport?: ElementRef<HTMLElement>;
   @ViewChild('navMenu', { read: ElementRef }) navMenu?: ElementRef<HTMLElement>;
 
+  private readonly reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   constructor(
     public auth: AuthService,
     private transitions: ViewTransitionService,
@@ -64,11 +67,35 @@ export class AppComponent implements AfterViewChecked {
   // hamburger toggle button).
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
+    // Global HUD ripple: any button/link/tab/magnetic gets one on click.
+    this.spawnRipple(event);
+
     if (!this.menuOpen) return;
     const target = event.target as Node;
     if (this.navMenu && !this.navMenu.nativeElement.contains(target)) {
       this.menuOpen = false;
     }
+  }
+
+  private spawnRipple(event: MouseEvent): void {
+    if (this.reducedMotion) return;
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const host = target.closest<HTMLElement>(
+      'button, a.magnetic, .env-tab, .navtab, .header-btn, .magnetic'
+    );
+    if (!host) return;
+    host.classList.add('jv-ripple');
+    const rect = host.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 1.8;
+    const node = document.createElement('span');
+    node.className = 'jv-ripple-node';
+    node.style.width = `${size}px`;
+    node.style.height = `${size}px`;
+    node.style.left = `${event.clientX - rect.left}px`;
+    node.style.top = `${event.clientY - rect.top}px`;
+    host.appendChild(node);
+    node.addEventListener('animationend', () => node.remove(), { once: true });
   }
 
   get view(): View {

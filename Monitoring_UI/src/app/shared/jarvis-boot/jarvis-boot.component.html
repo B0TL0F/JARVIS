@@ -1,15 +1,69 @@
 <div class="boot" *ngIf="visible" [class.fading]="fading" role="status" aria-label="Jarvis is initializing">
+  <!-- HUD grid backdrop -->
+  <div class="grid-bg"></div>
+  <div class="grid-scan"></div>
+
+  <!-- Floating corner brackets (Iron-Man HUD frame) -->
+  <div class="frame">
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+    <span class="frame-tag top">SYS &middot; JARVIS-14 &middot; ONLINE</span>
+    <span class="frame-tag bot">TELEMETRY BUS &middot; SECURE UPLINK</span>
+  </div>
+
+  <!-- Concentric rings + arc-reactor core -->
   <div class="rings">
+    <svg class="hud-arcs" viewBox="0 0 400 400" aria-hidden="true">
+      <defs>
+        <linearGradient id="jvArc" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ff2b2b" stop-opacity="0"/>
+          <stop offset="60%" stop-color="#ff5a5a" stop-opacity=".9"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <circle class="arc arc-a" cx="200" cy="200" r="175" fill="none" stroke="url(#jvArc)" stroke-width="1.4"/>
+      <circle class="arc arc-b" cx="200" cy="200" r="150" fill="none" stroke="#ff2b2b" stroke-width="1" stroke-dasharray="6 10"/>
+      <circle class="arc arc-c" cx="200" cy="200" r="125" fill="none" stroke="#ffffff" stroke-width=".8" stroke-dasharray="2 6"/>
+      <g class="arc-ticks">
+        <line *ngFor="let t of ticks" x1="200" y1="30" x2="200" y2="42" stroke="#ff2b2b" stroke-width="1" [attr.transform]="'rotate(' + t + ' 200 200)'"/>
+      </g>
+    </svg>
+
     <div class="ring r1"></div>
     <div class="ring r2"></div>
     <div class="ring r3"></div>
-    <div class="core"></div>
+    <div class="radar-sweep"></div>
+    <div class="core">
+      <span class="core-inner"></span>
+      <span class="core-glow"></span>
+    </div>
   </div>
 
-  <div class="wordmark">J&nbsp;A&nbsp;R&nbsp;V&nbsp;I&nbsp;S</div>
+  <div class="wordmark">
+    <span class="letter" *ngFor="let ch of letters; let i = index" [style.animation-delay.ms]="200 + i * 70">{{ ch }}</span>
+    <span class="wordmark-glitch" aria-hidden="true">J A R V I S</span>
+  </div>
+
+  <!-- Data stream columns on either side -->
+  <div class="data-stream left" aria-hidden="true">
+    <span class="stream-line" *ngFor="let l of streamLeft; let i = index" [style.animation-delay.ms]="i * 120">{{ l }}</span>
+  </div>
+  <div class="data-stream right" aria-hidden="true">
+    <span class="stream-line" *ngFor="let l of streamRight; let i = index" [style.animation-delay.ms]="i * 130">{{ l }}</span>
+  </div>
 
   <div class="log">
-    <div class="line done" *ngFor="let l of displayedLines">{{ l }}</div>
-    <div class="line typing" *ngIf="currentLine">{{ currentLine }}<span class="caret"></span></div>
+    <div class="line done" *ngFor="let l of displayedLines">
+      <span class="tag">[OK]</span>{{ l }}
+    </div>
+    <div class="line typing" *ngIf="currentLine">
+      <span class="tag pending">[..]</span>{{ currentLine }}<span class="caret"></span>
+    </div>
+  </div>
+
+  <div class="progress" [class.done]="fading">
+    <span class="bar"></span>
   </div>
 </div>

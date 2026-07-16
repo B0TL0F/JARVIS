@@ -38,7 +38,31 @@ header {
   color: #fff;
   box-shadow: 0 4px 20px var(--accent-glow);
   flex-shrink: 0;
+  position: relative;
+  animation: logo-breath 3.4s ease-in-out infinite;
 }
+.logo-icon::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 43, 43, 0.4);
+  animation: hud-spin 8s linear infinite;
+}
+.logo-icon::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 43, 43, 0.25);
+  animation: hud-spin-rev 14s linear infinite;
+}
+@keyframes logo-breath {
+  0%, 100% { box-shadow: 0 4px 20px var(--accent-glow); }
+  50%      { box-shadow: 0 4px 30px rgba(255, 43, 43, 0.8), 0 0 40px rgba(255, 43, 43, 0.35); }
+}
+@keyframes hud-spin { to { transform: rotate(360deg); } }
+@keyframes hud-spin-rev { to { transform: rotate(-360deg); } }
 
 h1 {
   margin: 0;
@@ -76,11 +100,36 @@ h1 {
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.header-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, transparent 40%, var(--accent) 50%, transparent 60%);
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-standard), background-position 600ms ease;
+  pointer-events: none;
 }
 .header-btn:hover {
   border-color: var(--accent);
   color: var(--text);
-  box-shadow: 0 0 12px var(--accent-soft);
+  box-shadow: 0 0 14px var(--accent-soft), 0 0 28px rgba(255, 43, 43, 0.12);
+  transform: translateY(-1px);
+}
+.header-btn:hover::before {
+  opacity: 1;
+  background-position: 0% 0;
 }
 
 .status-pill {
@@ -178,14 +227,34 @@ h1 {
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.navtab::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 2px;
+  height: 60%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform var(--dur-base) var(--ease-standard);
+  transform-origin: center;
+}
+.navtab.active::before,
+.navtab:hover::before {
+  transform: translateY(-50%) scaleY(1);
 }
 .navtab.active {
   background: var(--accent-soft);
   color: var(--accent-hover);
+  padding-left: 18px;
 }
 .navtab:hover:not(.active) {
   color: var(--text);
   background: var(--surface-hover);
+  padding-left: 18px;
 }
 
 .viewport {

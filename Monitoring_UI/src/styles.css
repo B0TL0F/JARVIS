@@ -79,6 +79,52 @@ body {
     radial-gradient(ellipse 90% 60% at 50% -30%, var(--bg-mesh-1), transparent 55%),
     radial-gradient(ellipse 50% 40% at 100% 0%, var(--bg-mesh-2), transparent 50%);
   background-attachment: fixed;
+  position: relative;
+}
+
+/* Ambient HUD scanline + subtle noise — always-on background motion so the
+   dashboard never feels dead. Kept low opacity to not interfere with content. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    rgba(255, 43, 43, 0.025) 3px,
+    rgba(255, 43, 43, 0.025) 4px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+body::after {
+  content: '';
+  position: fixed;
+  left: 0; right: 0;
+  height: 90px;
+  top: -90px;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(to bottom,
+    transparent 0%,
+    rgba(255, 43, 43, 0.06) 40%,
+    rgba(255, 43, 43, 0.18) 55%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 100%);
+  animation: jv-body-scan 9s linear infinite;
+  mix-blend-mode: screen;
+}
+@keyframes jv-body-scan {
+  0%   { top: -90px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100vh; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; display: none; }
 }
 
 body.hud-mode {
@@ -115,12 +161,16 @@ button, input, select, .env-tab, .tabs button {
     color var(--dur-fast) var(--ease-standard),
     border-color var(--dur-fast) var(--ease-standard),
     background-color var(--dur-fast) var(--ease-standard),
-    box-shadow var(--dur-fast) var(--ease-standard),
-    transform var(--dur-fast) var(--ease-standard);
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-standard);
 }
 
 button:active {
-  transform: translateY(1px);
+  transform: translateY(1px) scale(0.98);
+}
+
+button:not(:disabled):hover {
+  filter: brightness(1.08);
 }
 
 /* Headings carry the HUD identity everywhere by default — components can

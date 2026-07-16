@@ -1,120 +1,338 @@
+/* Jarvis boot splash — cinematic Iron-Man HUD initialisation moment. */
 .boot {
   position: fixed;
   inset: 0;
   z-index: 200000;
-  background: var(--surface-solid, #0d0b0d);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  transition: opacity 500ms ease;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255, 43, 43, 0.10), transparent 70%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, rgba(255, 43, 43, 0.14), transparent 60%),
+    #050507;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  transition: opacity 600ms ease, filter 600ms ease;
 }
 
 .boot.fading {
   opacity: 0;
+  filter: blur(6px) brightness(1.2);
 }
 
+/* HUD grid backdrop */
+.grid-bg {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 43, 43, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 43, 43, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 50%, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 50%, black 40%, transparent 100%);
+  animation: grid-drift 20s linear infinite;
+  opacity: 0.55;
+}
+.grid-scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 140px;
+  background: linear-gradient(to bottom,
+    transparent, rgba(255, 43, 43, 0.18) 40%, rgba(255, 255, 255, 0.06) 50%, transparent);
+  animation: hud-scan-y 3.4s cubic-bezier(0.65, 0.05, 0.35, 1) infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+@keyframes grid-drift { to { background-position: 48px 48px; } }
+@keyframes hud-scan-y {
+  0% { transform: translateY(-40vh); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+
+/* HUD frame corners + tags */
+.frame {
+  position: absolute; inset: 40px;
+  pointer-events: none;
+  animation: frame-in 700ms ease-out both;
+}
+.corner {
+  position: absolute;
+  width: 40px; height: 40px;
+  border-color: var(--accent);
+  border-style: solid;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+.corner.tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.corner.tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.corner.br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+.frame-tag {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  color: var(--accent-hover);
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.frame-tag.top { top: -22px; left: 8px; }
+.frame-tag.bot { bottom: -22px; right: 8px; }
+
+@keyframes frame-in {
+  from { opacity: 0; transform: scale(1.03); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Rings + arc-reactor core */
 .rings {
   position: relative;
-  width: 280px;
-  height: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 400px;
+  height: 400px;
+  display: grid;
+  place-items: center;
 }
+
+.hud-arcs {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  filter: drop-shadow(0 0 12px rgba(255, 43, 43, 0.5));
+}
+.hud-arcs .arc {
+  transform-origin: 200px 200px;
+  stroke-linecap: round;
+}
+.arc-a { animation: hud-spin 12s linear infinite; }
+.arc-b { animation: hud-spin-rev 18s linear infinite; opacity: 0.65; }
+.arc-c { animation: hud-spin 6s linear infinite; opacity: 0.9; }
+.arc-ticks { transform-origin: 200px 200px; animation: hud-spin 30s linear infinite; }
 
 .ring {
   position: absolute;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
 }
-
 .r1 {
-  width: 120px;
-  height: 120px;
-  animation: ring-in 700ms ease-out both, hud-spin 8s linear infinite;
+  width: 130px; height: 130px;
+  border-color: rgba(255, 90, 90, 0.7);
+  box-shadow: 0 0 24px rgba(255, 43, 43, 0.3), inset 0 0 24px rgba(255, 43, 43, 0.2);
+  animation: ring-in 800ms cubic-bezier(0.2, 0.7, 0.2, 1.1) both, hud-spin 8s linear infinite;
 }
 .r2 {
-  width: 200px;
-  height: 200px;
-  animation: ring-in 700ms ease-out 150ms both, hud-spin-rev 12s linear infinite;
+  width: 220px; height: 220px;
+  border-style: dashed;
+  animation: ring-in 800ms cubic-bezier(0.2, 0.7, 0.2, 1.1) 120ms both, hud-spin-rev 14s linear infinite;
 }
 .r3 {
-  width: 280px;
-  height: 280px;
-  border-style: dashed;
-  animation: ring-in 700ms ease-out 300ms both, hud-spin 20s linear infinite;
+  width: 320px; height: 320px;
+  border-color: rgba(255, 43, 43, 0.4);
+  animation: ring-in 800ms cubic-bezier(0.2, 0.7, 0.2, 1.1) 220ms both, hud-spin 24s linear infinite;
+}
+
+.radar-sweep {
+  position: absolute;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    rgba(255, 43, 43, 0.55) 0deg,
+    rgba(255, 43, 43, 0.18) 20deg,
+    transparent 60deg 360deg);
+  animation: hud-spin 2.4s linear infinite;
+  mix-blend-mode: screen;
+  filter: blur(1px);
 }
 
 .core {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+}
+.core-inner {
+  position: absolute;
+  width: 10px; height: 10px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 16px var(--accent-glow), 0 0 32px var(--accent-soft);
-  animation: core-pulse 1.6s ease-in-out infinite;
+  background: radial-gradient(circle, #fff 0%, #ff2b2b 60%, #7a0606 100%);
+  box-shadow:
+    0 0 12px #ff2b2b,
+    0 0 26px rgba(255, 43, 43, 0.9),
+    0 0 52px rgba(255, 43, 43, 0.4);
+  animation: core-pulse 1.4s ease-in-out infinite;
+}
+.core-glow {
+  position: absolute;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 43, 43, 0.5), transparent 70%);
+  animation: core-glow 1.4s ease-in-out infinite;
 }
 
 @keyframes ring-in {
-  from { transform: scale(0); opacity: 0; }
+  from { transform: scale(0.4); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
 @keyframes core-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50%      { transform: scale(1.3); opacity: 1; }
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.35); box-shadow: 0 0 24px #fff, 0 0 40px #ff2b2b, 0 0 80px rgba(255, 43, 43, 0.6); }
+}
+@keyframes core-glow {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50%      { opacity: 0.85; transform: scale(1.2); }
 }
 @keyframes hud-spin { to { transform: rotate(360deg); } }
 @keyframes hud-spin-rev { to { transform: rotate(-360deg); } }
 
+/* Wordmark — glitching letters */
 .wordmark {
+  position: absolute;
+  bottom: 22%;
+  left: 50%; transform: translateX(-50%);
   font-family: var(--font);
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: 0.4em;
+  font-weight: 800;
+  font-size: 2rem;
+  letter-spacing: 0.5em;
   color: var(--accent);
   text-shadow: 0 0 16px var(--accent-glow), 0 0 32px var(--accent-soft);
-  animation: wordmark-in 600ms ease-out 200ms both;
+  display: flex;
+  gap: 0.15em;
+}
+.wordmark .letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px) scale(0.6);
+  animation: letter-drop 520ms cubic-bezier(0.2, 0.7, 0.2, 1.1) forwards, letter-flicker 4s ease-in-out infinite 1.2s;
+}
+@keyframes letter-drop {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes letter-flicker {
+  0%, 92%, 100% { opacity: 1; text-shadow: 0 0 16px var(--accent-glow), 0 0 32px var(--accent-soft); }
+  94% { opacity: 0.4; text-shadow: 2px 0 0 #00e5ff, -2px 0 0 #ff2b2b; }
+  96% { opacity: 1; }
+  97% { opacity: 0.6; }
+}
+.wordmark-glitch {
+  position: absolute; inset: 0;
+  color: rgba(0, 229, 255, 0.35);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: glitch-shift 3.2s steps(1) infinite;
+  letter-spacing: 0.5em;
+  font-weight: 800;
+  font-size: 2rem;
+}
+@keyframes glitch-shift {
+  0%, 90%, 100% { transform: translate(0, 0); opacity: 0; }
+  91% { transform: translate(2px, -1px); opacity: 0.6; }
+  92% { transform: translate(-2px, 1px); opacity: 0.5; }
+  93% { transform: translate(1px, 1px); opacity: 0.4; }
 }
 
-@keyframes wordmark-in {
-  from { opacity: 0; letter-spacing: 0.8em; }
-  to   { opacity: 1; letter-spacing: 0.4em; }
-}
-
-.log {
+/* Data stream columns */
+.data-stream {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column;
+  gap: 6px;
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: 0.68rem;
+  color: rgba(255, 90, 90, 0.65);
+  letter-spacing: 0.06em;
+  max-width: 220px;
+}
+.data-stream.left { left: 6%; align-items: flex-start; }
+.data-stream.right { right: 6%; align-items: flex-end; text-align: right; }
+.stream-line {
+  opacity: 0;
+  transform: translateX(-8px);
+  animation: stream-in 500ms ease-out forwards, stream-flicker 5s ease-in-out infinite;
+  white-space: nowrap;
+}
+.data-stream.right .stream-line { transform: translateX(8px); }
+@keyframes stream-in {
+  to { opacity: 0.75; transform: translateX(0); }
+}
+@keyframes stream-flicker {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 0.35; }
+}
+
+/* Boot log */
+.log {
+  position: absolute;
+  bottom: 8%;
+  left: 50%; transform: translateX(-50%);
+  min-height: 6em;
+  font-family: var(--mono);
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   color: var(--accent-hover);
-  min-height: 5.5em;
-  text-align: center;
+  text-align: left;
+  min-width: 380px;
 }
-
-.line {
-  line-height: 1.6;
-}
-.line.done {
-  color: #6fe0a0;
+.line { line-height: 1.65; display: flex; gap: 8px; }
+.line.done { color: #6fe0a0; }
+.line.done .tag { color: #6fe0a0; }
+.line.typing .tag.pending { color: var(--accent); }
+.tag {
+  display: inline-block;
+  min-width: 34px;
+  font-weight: 700;
+  opacity: 0.9;
 }
 
 .caret {
   display: inline-block;
-  width: 7px;
-  height: 1em;
-  margin-left: 2px;
+  width: 8px; height: 1em;
+  margin-left: 4px;
   background: var(--accent);
   vertical-align: text-bottom;
-  animation: caret-blink 0.8s steps(1) infinite;
+  animation: caret-blink 0.7s steps(1) infinite;
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+
+/* Progress bar */
+.progress {
+  position: absolute;
+  bottom: 4%;
+  left: 50%; transform: translateX(-50%);
+  width: 360px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 43, 43, 0.14);
+  overflow: hidden;
+}
+.progress .bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(255, 43, 43, 0.3), #ff2b2b, #fff, #ff2b2b);
+  background-size: 200% 100%;
+  animation: bar-load 3.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards, bar-shimmer 1.4s linear infinite;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.progress.done .bar { width: 100%; }
+@keyframes bar-load {
+  0%   { width: 0%; }
+  40%  { width: 55%; }
+  80%  { width: 90%; }
+  100% { width: 100%; }
+}
+@keyframes bar-shimmer { to { background-position: -200% 0; } }
+
+@media (max-width: 720px) {
+  .data-stream { display: none; }
+  .rings { transform: scale(0.75); }
+  .log { min-width: 0; width: 90vw; font-size: 0.7rem; }
+  .progress { width: 80vw; }
 }
 
-@keyframes caret-blink {
-  50% { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .arc-a, .arc-b, .arc-c, .arc-ticks,
+  .r1, .r2, .r3, .radar-sweep,
+  .core-inner, .core-glow, .grid-bg, .grid-scan,
+  .wordmark .letter, .wordmark-glitch, .stream-line, .progress .bar {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .progress .bar { width: 100%; }
 }
-
-/* This component intentionally provides its own simplified/fast path for
-   reduced-motion (see jarvis-boot.component.ts) rather than being disabled
-   entirely — the ring/core animations are brief (<1s) and non-parallax, so
-   the sitewide reduced-motion collapse-to-near-zero rule is acceptable here
-   as a further speed-up rather than something to fight. */
