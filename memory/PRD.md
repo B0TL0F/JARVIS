@@ -34,13 +34,16 @@ User confirmed: "go all out" — full-cinematic Iron-Man-style HUD upgrade.
   - Pulsing radial halo around the center dot
   - White-flash pressed state
   - Auto-hides on touch/coarse-pointer devices
-- **Cinematic login → dashboard globe transition** (`shared/jarvis-intro/*` + `services/login-intro.service.ts`):
+- **Cinematic login → dashboard globe transition** (`services/login-intro.service.ts` — body-mounted imperative overlay, NOT Angular ngIf):
   - Login page now shows a live preview HUD globe next to the sign-in card, with its own reticle rings + tick marks + `JARVIS · ORBIT · SYNC` label
-  - On successful login: a full-screen `JarvisIntroComponent` overlay plays a 2.4s cinematic — globe materialises tiny at the card position, scales up to fill center with radial energy burst + HUD rings, an `ACCESS · GRANTED` label pulses in, then the globe contracts and drifts to the dashboard globe stage while the overlay fades and the dashboard is revealed
-  - The dashboard mounts underneath during the intro so it's ready the moment the overlay fades
+  - Successful login → verify (HTTP) → auth.commit (flips signal to authenticated) fires simultaneously with intro.play() which appends a body-level `<div class="jv-intro-overlay">`
+  - Overlay is fully bypassed from Angular's change detection so it can't be prematurely unmounted by unrelated CD cycles (fixes issue where signal/observable-driven `*ngIf` was unmounting the intro at ~800ms mid-animation when dashboard's status polling fired CD)
+  - GSAP timeline plays: overlay fade-in → globe materialises small + rotated → concentric rings + tick marks reveal → radial energy burst peaks → **ACCESS · GRANTED** label tracks-out with `// JARVIS UPLINK ESTABLISHED` subtitle → globe contracts + drifts upward → overlay fades revealing dashboard
+  - Globe rendered via layered CSS 3D wireframe (not a second WebGL context, so it's instant/cheap)
+- **AuthService split into `verify()` + `commit()`** so login screen can validate credentials WITHOUT flipping the auth signal (which used to destroy LoginComponent mid-flight)
 - **Login page HUD frame** — 4 corner brackets + top/bottom system tags around the whole login viewport
 - Updated header `h1` to Orbitron with tracked-out uppercase treatment
-- Bumped production initial bundle budget to 1.5MB to accommodate the intro component + fonts
+- Bumped production initial bundle budget to 1.5MB to accommodate the intro overlay + fonts
 1. **Boot splash → cinematic** (`shared/jarvis-boot/*`):
    - Multi-ring choreography (5 concentric rings, dashed + solid + dotted)
    - Arc-reactor pulsing core with radial glow halo

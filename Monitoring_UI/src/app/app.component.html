@@ -1,11 +1,6 @@
 <app-jarvis-boot></app-jarvis-boot>
 <app-custom-cursor></app-custom-cursor>
 
-<!-- Cinematic login → dashboard transition overlay. Rendered on top of
-     everything for ~2.4s right after a successful sign-in. The dashboard
-     mounts behind it and is revealed as this overlay fades. -->
-<app-jarvis-intro *ngIf="intro.playing()"></app-jarvis-intro>
-
 <ng-container *ngIf="auth.isAuthenticated(); else loginGate">
   <div class="app">
     <header>

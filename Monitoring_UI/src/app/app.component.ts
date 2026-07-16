@@ -9,11 +9,9 @@ import { SettingsComponent } from './settings/settings.component';
 import { TargetsComponent } from './targets/targets.component';
 import { AuthService } from './services/auth.service';
 import { ViewTransitionService } from './services/view-transition.service';
-import { LoginIntroService } from './services/login-intro.service';
 import { MagneticDirective } from './shared/magnetic.directive';
 import { CustomCursorComponent } from './shared/custom-cursor/custom-cursor.component';
 import { JarvisBootComponent } from './shared/jarvis-boot/jarvis-boot.component';
-import { JarvisIntroComponent } from './shared/jarvis-intro/jarvis-intro.component';
 import { HistoryComponent } from './history/history.component';
 
 type View = 'dashboard' | 'pipelines' | 'history' | 'targets' | 'users' | 'activity' | 'settings';
@@ -33,7 +31,6 @@ type View = 'dashboard' | 'pipelines' | 'history' | 'targets' | 'users' | 'activ
     MagneticDirective,
     CustomCursorComponent,
     JarvisBootComponent,
-    JarvisIntroComponent,
     HistoryComponent
   ],
   templateUrl: './app.component.html',
@@ -55,7 +52,6 @@ export class AppComponent implements AfterViewChecked {
 
   constructor(
     public auth: AuthService,
-    public intro: LoginIntroService,
     private transitions: ViewTransitionService,
     private renderer: Renderer2,
     private hostRef: ElementRef<HTMLElement>

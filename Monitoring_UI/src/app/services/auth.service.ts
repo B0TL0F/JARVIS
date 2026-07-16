@@ -27,24 +27,37 @@ export class AuthService {
   }
 
   async login(username: string, password: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.verify(username, password);
+    if (!result.success) return { success: false, error: result.error };
+    this.commit(result.role!, result.encoded!);
+    return { success: true };
+  }
+
+  // Two-phase login used by the cinematic sign-in flow. `verify()` performs
+  // the network call and returns the encoded credentials + role without
+  // touching the auth signal (so the login screen stays mounted). `commit()`
+  // is called AFTER the transition intro overlay is on-screen, flipping
+  // the auth signal and letting the dashboard mount underneath the intro.
+  async verify(username: string, password: string): Promise<{ success: boolean; error?: string; role?: Role; encoded?: string }> {
     const encoded = btoa(`${username}:${password}`);
     try {
-      // /api/me validates the credentials and returns the role (and records the
-      // login in the activity log server-side).
       const me = await firstValueFrom(
         this.http.get<Me>('/api/me', { headers: { Authorization: `Basic ${encoded}` } })
       );
-      sessionStorage.setItem(STORAGE_KEY, encoded);
-      sessionStorage.setItem(ROLE_KEY, me.role);
-      this._role.set(me.role);
-      this._isAuthenticated.set(true);
-      return { success: true };
+      return { success: true, role: me.role, encoded };
     } catch (err: any) {
       if (err?.status === 401) {
         return { success: false, error: 'Wrong username or password.' };
       }
       return { success: false, error: 'Could not reach Jarvis. Is the stack running?' };
     }
+  }
+
+  commit(role: Role, encoded?: string): void {
+    if (encoded) sessionStorage.setItem(STORAGE_KEY, encoded);
+    sessionStorage.setItem(ROLE_KEY, role);
+    this._role.set(role);
+    this._isAuthenticated.set(true);
   }
 
   logout(): void {

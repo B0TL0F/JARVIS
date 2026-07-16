@@ -24,15 +24,26 @@ export class LoginComponent {
     if (!this.username || !this.password || this.submitting) return;
     this.submitting = true;
     this.error = null;
-    const result = await this.auth.login(this.username, this.password);
+
+    // Verify credentials first (small HTTP call). If they're wrong, no intro.
+    // If they're right, immediately kick off the cinematic intro overlay
+    // WHILE flipping the auth signal — this way the intro is mounted in the
+    // same tick as the login → dashboard swap, and stays alive on top of
+    // the dashboard for its full duration.
+    const result = await this.auth.verify(this.username, this.password);
     if (!result.success) {
       this.submitting = false;
       this.error = result.error ?? 'Sign-in failed.';
       return;
     }
-    // Keep the submitting flag on while the cinematic transition plays so
-    // the button doesn't briefly re-enable and re-flash "Enter Jarvis".
-    await this.intro.play();
+
+    // Kick off the intro FIRST, then flip auth. The intro overlay is
+    // body-appended (bypassing Angular's CD) so it can't be prematurely
+    // unmounted by unrelated change detection cycles.
+    const introDone = this.intro.play();
+    this.auth.commit(result.role!);
+
+    await introDone;
     this.submitting = false;
   }
 }
