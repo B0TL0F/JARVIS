@@ -1,24 +1,51 @@
 <div class="gate">
-  <div class="panel">
-    <div class="eyebrow">JARVIS · ACCESS CONTROL</div>
-    <h1>Sign in to Jarvis</h1>
-    <p class="sub">Credentials gate the live status board for all 14 services.</p>
+  <!-- HUD frame + ambient reticle on the login gate. -->
+  <div class="gate-frame">
+    <span class="gate-corner tl"></span>
+    <span class="gate-corner tr"></span>
+    <span class="gate-corner bl"></span>
+    <span class="gate-corner br"></span>
+    <span class="gate-tag top">// SECURE UPLINK &middot; QA STATUS BOARD</span>
+    <span class="gate-tag bot">// AUTHENTICATED SESSIONS &middot; ROLE-GATED</span>
+  </div>
 
-    <form (ngSubmit)="submit()">
-      <label>
-        <span>Operator ID</span>
-        <input type="text" name="username" [(ngModel)]="username" autocomplete="username" autofocus />
-      </label>
-      <label>
-        <span>Passcode</span>
-        <input type="password" name="password" [(ngModel)]="password" autocomplete="current-password" />
-      </label>
+  <div class="gate-inner">
+    <!-- Preview globe next to the form, small + always-on. Visually cues
+         the user that JARVIS is watching before they've even signed in. -->
+    <div class="preview-globe" aria-hidden="true">
+      <span class="pg-ring r1"></span>
+      <span class="pg-ring r2"></span>
+      <span class="pg-tick m1"></span>
+      <span class="pg-tick m2"></span>
+      <span class="pg-tick m3"></span>
+      <span class="pg-tick m4"></span>
+      <div class="pg-canvas">
+        <app-hud-globe status="up"></app-hud-globe>
+      </div>
+      <div class="pg-label">JARVIS · ORBIT · SYNC</div>
+    </div>
 
-      <div class="error" *ngIf="error" role="alert">{{ error }}</div>
+    <div class="panel">
+      <div class="eyebrow">JARVIS &middot; ACCESS CONTROL</div>
+      <h1>Sign in to Jarvis</h1>
+      <p class="sub">Credentials gate the live status board for all 14 services.</p>
 
-      <button type="submit" [disabled]="submitting">
-        {{ submitting ? 'Verifying…' : 'Enter Jarvis' }}
-      </button>
-    </form>
+      <form (ngSubmit)="submit()">
+        <label>
+          <span>Operator ID</span>
+          <input type="text" name="username" [(ngModel)]="username" autocomplete="username" autofocus />
+        </label>
+        <label>
+          <span>Passcode</span>
+          <input type="password" name="password" [(ngModel)]="password" autocomplete="current-password" />
+        </label>
+
+        <div class="error" *ngIf="error" role="alert">{{ error }}</div>
+
+        <button type="submit" [disabled]="submitting">
+          {{ submitting ? 'Verifying…' : 'Enter Jarvis' }}
+        </button>
+      </form>
+    </div>
   </div>
 </div>

@@ -35,8 +35,10 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.65);
 
-  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font: 'Rajdhani', 'Chakra Petch', system-ui, sans-serif;
+  --font-hud: 'Chakra Petch', 'Rajdhani', system-ui, sans-serif;
+  --font-display: 'Orbitron', 'Chakra Petch', sans-serif;
+  --mono: 'Share Tech Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Legacy token names — kept as aliases so existing component CSS (written
@@ -56,7 +58,6 @@
   --glow: 0 0 12px var(--accent-soft);
   --glow-strong: 0 0 22px rgba(255, 43, 43, 0.3);
   --glass-blur: blur(16px);
-  --font-display: var(--font);
   --font-body: var(--font);
   --font-data: var(--mono);
 }
@@ -82,8 +83,9 @@ body {
   position: relative;
 }
 
-/* Ambient HUD scanline + subtle noise — always-on background motion so the
-   dashboard never feels dead. Kept low opacity to not interfere with content. */
+/* Extremely subtle raster overlay for HUD grain. Kept low opacity so it
+   never obscures text. The sweeping vertical scan bar was removed because
+   it crossed text at random and hurt readability. */
 body::before {
   content: '';
   position: fixed;
@@ -94,37 +96,11 @@ body::before {
     to bottom,
     transparent 0,
     transparent 3px,
-    rgba(255, 43, 43, 0.025) 3px,
-    rgba(255, 43, 43, 0.025) 4px
+    rgba(255, 43, 43, 0.014) 3px,
+    rgba(255, 43, 43, 0.014) 4px
   );
   mix-blend-mode: screen;
-  opacity: 0.7;
-}
-body::after {
-  content: '';
-  position: fixed;
-  left: 0; right: 0;
-  height: 90px;
-  top: -90px;
-  pointer-events: none;
-  z-index: 0;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    rgba(255, 43, 43, 0.06) 40%,
-    rgba(255, 43, 43, 0.18) 55%,
-    rgba(255, 255, 255, 0.08) 60%,
-    transparent 100%);
-  animation: jv-body-scan 9s linear infinite;
-  mix-blend-mode: screen;
-}
-@keyframes jv-body-scan {
-  0%   { top: -90px; opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { top: 100vh; opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  body::after { animation: none; display: none; }
+  opacity: 0.35;
 }
 
 body.hud-mode {

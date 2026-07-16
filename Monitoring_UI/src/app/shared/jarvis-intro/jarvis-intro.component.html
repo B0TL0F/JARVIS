@@ -1,0 +1,29 @@
+<div #overlay class="intro-overlay" role="status" aria-live="polite">
+  <!-- HUD frame corners -->
+  <span class="hud-corner tl"></span>
+  <span class="hud-corner tr"></span>
+  <span class="hud-corner bl"></span>
+  <span class="hud-corner br"></span>
+
+  <!-- Radial energy burst behind the globe -->
+  <div #burst class="burst"></div>
+
+  <!-- Concentric HUD rings around the incoming globe -->
+  <div #rings class="rings">
+    <span class="ring r1"></span>
+    <span class="ring r2"></span>
+    <span class="ring r3"></span>
+    <span class="reticle-mark m1"></span>
+    <span class="reticle-mark m2"></span>
+    <span class="reticle-mark m3"></span>
+    <span class="reticle-mark m4"></span>
+  </div>
+
+  <!-- The globe itself -->
+  <div #stage class="globe-stage">
+    <app-hud-globe status="up"></app-hud-globe>
+  </div>
+
+  <!-- Access granted label -->
+  <div #label class="access-label">ACCESS &middot; GRANTED</div>
+</div>

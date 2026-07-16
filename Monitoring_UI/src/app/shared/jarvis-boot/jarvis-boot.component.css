@@ -185,8 +185,8 @@
   position: absolute;
   bottom: 22%;
   left: 50%; transform: translateX(-50%);
-  font-family: var(--font);
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 900;
   font-size: 2rem;
   letter-spacing: 0.5em;
   color: var(--accent);
@@ -216,7 +216,8 @@
   pointer-events: none;
   animation: glitch-shift 3.2s steps(1) infinite;
   letter-spacing: 0.5em;
-  font-weight: 800;
+  font-weight: 900;
+  font-family: var(--font-display);
   font-size: 2rem;
 }
 @keyframes glitch-shift {

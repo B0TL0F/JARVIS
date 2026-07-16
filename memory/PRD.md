@@ -18,7 +18,29 @@ User confirmed: "go all out" — full-cinematic Iron-Man-style HUD upgrade.
 - **Admin** (`devops`/`Cargo-Watch-2026!` local): full nav (Dashboard, Pipelines, History, Targets, Users, Activity, Settings)
 - **Developer**: read-only Dashboard / Pipelines / History
 
-## What's been implemented (2026-01-16 — animation pass)
+## What's been implemented (2026-01-16 — animation pass v2)
+
+### v2 additions (this iteration)
+- **Readability fix**: Removed the intrusive `body::after` vertical scan-bar that was crossing text on the dashboard. `body::before` raster grain dropped to opacity 0.35 with lighter red so it never obscures readable content.
+- **New font system** (loaded from Google Fonts in `index.html`):
+  - `--font-display`: **Orbitron** — blocky sci-fi wordmark (used for "JARVIS" logo, boot wordmark, page headings)
+  - `--font-hud`: **Chakra Petch** — geometric HUD sans (used for tracked-out UI labels)
+  - `--font` (body): **Rajdhani** — condensed reading sans
+  - `--mono`: **Share Tech Mono** — HUD data monospace (log lines, codes, uplink tags)
+- **JARVIS reticle cursor** (`shared/custom-cursor/*`) — completely rebuilt:
+  - Rotating outer ring with 8 tick segments + dashed inner ring
+  - 4-directional crosshair blades that expand outward on hover
+  - Corner brackets that fade in on hovering interactive elements
+  - Pulsing radial halo around the center dot
+  - White-flash pressed state
+  - Auto-hides on touch/coarse-pointer devices
+- **Cinematic login → dashboard globe transition** (`shared/jarvis-intro/*` + `services/login-intro.service.ts`):
+  - Login page now shows a live preview HUD globe next to the sign-in card, with its own reticle rings + tick marks + `JARVIS · ORBIT · SYNC` label
+  - On successful login: a full-screen `JarvisIntroComponent` overlay plays a 2.4s cinematic — globe materialises tiny at the card position, scales up to fill center with radial energy burst + HUD rings, an `ACCESS · GRANTED` label pulses in, then the globe contracts and drifts to the dashboard globe stage while the overlay fades and the dashboard is revealed
+  - The dashboard mounts underneath during the intro so it's ready the moment the overlay fades
+- **Login page HUD frame** — 4 corner brackets + top/bottom system tags around the whole login viewport
+- Updated header `h1` to Orbitron with tracked-out uppercase treatment
+- Bumped production initial bundle budget to 1.5MB to accommodate the intro component + fonts
 1. **Boot splash → cinematic** (`shared/jarvis-boot/*`):
    - Multi-ring choreography (5 concentric rings, dashed + solid + dotted)
    - Arc-reactor pulsing core with radial glow halo
