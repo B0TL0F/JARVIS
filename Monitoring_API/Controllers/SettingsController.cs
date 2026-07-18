@@ -51,8 +51,142 @@ public class SettingsController : ControllerBase
             ocelot = new
             {
                 directory = _ocelot.OcelotDirectory
+            },
+            aiProvider = new AiProviderSettingsDto
+            {
+                Provider = await _settings.GetEffectiveAsync(SettingKeys.AiProvider, ct) ?? "claude"
+            },
+            claude = new ClaudeSettingsDto
+            {
+                Model = await _settings.GetEffectiveAsync(SettingKeys.ClaudeModel, ct) ?? "claude-opus-4-8",
+                ApiKeyConfigured = await _settings.HasValueAsync(SettingKeys.ClaudeApiKey, ct)
+            },
+            gemini = new GeminiSettingsDto
+            {
+                Model = await _settings.GetEffectiveAsync(SettingKeys.GeminiModel, ct) ?? "gemini-2.0-flash",
+                ApiKeyConfigured = await _settings.HasValueAsync(SettingKeys.GeminiApiKey, ct)
+            },
+            groq = new GroqSettingsDto
+            {
+                Model = await _settings.GetEffectiveAsync(SettingKeys.GroqModel, ct) ?? "llama-3.3-70b-versatile",
+                ApiKeyConfigured = await _settings.HasValueAsync(SettingKeys.GroqApiKey, ct)
+            },
+            alerts = new AlertSettingsDto
+            {
+                Enabled = string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AlertsEnabled, ct), "true", StringComparison.OrdinalIgnoreCase),
+                TeamsWebhookConfigured = await _settings.HasValueAsync(SettingKeys.AlertsTeamsWebhookUrl, ct),
+                SmtpHost = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpHost, ct),
+                SmtpPort = int.TryParse(await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpPort, ct), out var port) ? port : null,
+                SmtpUsername = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpUsername, ct),
+                SmtpFrom = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpFrom, ct),
+                SmtpTo = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpTo, ct),
+                SmtpPasswordConfigured = await _settings.HasValueAsync(SettingKeys.AlertsSmtpPassword, ct)
             }
         });
+    }
+
+    [HttpPut("claude")]
+    public async Task<IActionResult> UpdateClaude([FromBody] ClaudeSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        await _settings.SetAsync(SettingKeys.ClaudeModel, string.IsNullOrWhiteSpace(req.Model) ? null : req.Model.Trim(), ct);
+
+        // Only overwrite the API key when a new one is supplied — blank means "keep existing".
+        if (!string.IsNullOrWhiteSpace(req.ApiKey))
+        {
+            await _settings.SetAsync(SettingKeys.ClaudeApiKey, req.ApiKey.Trim(), ct);
+        }
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.claude", "Updated Claude AI settings", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpPut("gemini")]
+    public async Task<IActionResult> UpdateGemini([FromBody] GeminiSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        await _settings.SetAsync(SettingKeys.GeminiModel, string.IsNullOrWhiteSpace(req.Model) ? null : req.Model.Trim(), ct);
+
+        // Only overwrite the API key when a new one is supplied — blank means "keep existing".
+        if (!string.IsNullOrWhiteSpace(req.ApiKey))
+        {
+            await _settings.SetAsync(SettingKeys.GeminiApiKey, req.ApiKey.Trim(), ct);
+        }
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.gemini", "Updated Gemini AI settings", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpPut("groq")]
+    public async Task<IActionResult> UpdateGroq([FromBody] GroqSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        await _settings.SetAsync(SettingKeys.GroqModel, string.IsNullOrWhiteSpace(req.Model) ? null : req.Model.Trim(), ct);
+
+        // Only overwrite the API key when a new one is supplied — blank means "keep existing".
+        if (!string.IsNullOrWhiteSpace(req.ApiKey))
+        {
+            await _settings.SetAsync(SettingKeys.GroqApiKey, req.ApiKey.Trim(), ct);
+        }
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.groq", "Updated Groq AI settings", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpPut("ai-provider")]
+    public async Task<IActionResult> UpdateAiProvider([FromBody] AiProviderSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        var provider = req.Provider?.ToLowerInvariant() switch
+        {
+            "gemini" => "gemini",
+            "groq" => "groq",
+            _ => "claude"
+        };
+        await _settings.SetAsync(SettingKeys.AiProvider, provider, ct);
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.ai-provider", $"Switched AI provider to '{provider}'", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpPut("alerts")]
+    public async Task<IActionResult> UpdateAlerts([FromBody] AlertSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        await _settings.SetAsync(SettingKeys.AlertsEnabled, req.Enabled ? "true" : "false", ct);
+        await _settings.SetAsync(SettingKeys.AlertsSmtpHost, string.IsNullOrWhiteSpace(req.SmtpHost) ? null : req.SmtpHost.Trim(), ct);
+        await _settings.SetAsync(SettingKeys.AlertsSmtpPort, req.SmtpPort?.ToString(), ct);
+        await _settings.SetAsync(SettingKeys.AlertsSmtpUsername, string.IsNullOrWhiteSpace(req.SmtpUsername) ? null : req.SmtpUsername.Trim(), ct);
+        await _settings.SetAsync(SettingKeys.AlertsSmtpFrom, string.IsNullOrWhiteSpace(req.SmtpFrom) ? null : req.SmtpFrom.Trim(), ct);
+        await _settings.SetAsync(SettingKeys.AlertsSmtpTo, string.IsNullOrWhiteSpace(req.SmtpTo) ? null : req.SmtpTo.Trim(), ct);
+
+        // Only overwrite secrets when a new value is supplied — blank means "keep existing".
+        if (!string.IsNullOrWhiteSpace(req.TeamsWebhookUrl))
+        {
+            await _settings.SetAsync(SettingKeys.AlertsTeamsWebhookUrl, req.TeamsWebhookUrl.Trim(), ct);
+        }
+        if (!string.IsNullOrWhiteSpace(req.SmtpPassword))
+        {
+            await _settings.SetAsync(SettingKeys.AlertsSmtpPassword, req.SmtpPassword.Trim(), ct);
+        }
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.alerts", "Updated alert delivery settings", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
     }
 
     [HttpPut("azure-devops")]

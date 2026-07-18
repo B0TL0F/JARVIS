@@ -46,6 +46,164 @@
       </form>
     </section>
 
+    <!-- AI Provider -->
+    <section class="card jv-stagger" style="animation-delay: 20ms">
+      <h3>AI Provider</h3>
+      <p class="hint">Chooses which backend powers every AI feature below (narratives, alerts, chat, and the trigger-build tool). Switch anytime — no code changes needed.</p>
+
+      <form (ngSubmit)="saveProvider()">
+        <label>
+          <span>Active provider</span>
+          <select name="aiProvider" [(ngModel)]="aiProvider">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="groq">Groq (free tier, Llama 3.3 70B)</option>
+          </select>
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingProvider">{{ savingProvider ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="providerSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Claude AI -->
+    <section class="card jv-stagger" style="animation-delay: 40ms">
+      <h3>Claude AI</h3>
+      <p class="hint">Powers AI root-cause narratives, alert summaries, and the "Ask Jarvis" assistant when Claude is the active provider. Without a key, these features fall back to plain heuristic text automatically.</p>
+
+      <form (ngSubmit)="saveClaude()">
+        <label>
+          <span>Model</span>
+          <select name="claudeModel" [(ngModel)]="claudeModel">
+            <option value="claude-opus-4-8">claude-opus-4-8 (default)</option>
+            <option value="claude-sonnet-5">claude-sonnet-5 (faster/cheaper, recommended for this workload)</option>
+          </select>
+        </label>
+        <label>
+          <span>API Key
+            <em class="pat-state" [class.on]="claudeApiKeyConfigured">{{ claudeApiKeyConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="claudeApiKey" [(ngModel)]="claudeApiKey"
+                 [placeholder]="claudeApiKeyConfigured ? '•••••••• (leave blank to keep)' : 'Paste Claude API key'" autocomplete="new-password" />
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingClaude">{{ savingClaude ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="claudeSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Gemini AI -->
+    <section class="card jv-stagger" style="animation-delay: 50ms">
+      <h3>Gemini AI</h3>
+      <p class="hint">Powers the same AI features as Claude, when Gemini is the active provider above. Get a key at aistudio.google.com.</p>
+
+      <form (ngSubmit)="saveGemini()">
+        <label>
+          <span>Model</span>
+          <select name="geminiModel" [(ngModel)]="geminiModel">
+            <option value="gemini-2.0-flash">gemini-2.0-flash (default, fast/cheap)</option>
+            <option value="gemini-2.0-pro">gemini-2.0-pro (stronger reasoning)</option>
+          </select>
+        </label>
+        <label>
+          <span>API Key
+            <em class="pat-state" [class.on]="geminiApiKeyConfigured">{{ geminiApiKeyConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="geminiApiKey" [(ngModel)]="geminiApiKey"
+                 [placeholder]="geminiApiKeyConfigured ? '•••••••• (leave blank to keep)' : 'Paste Gemini API key'" autocomplete="new-password" />
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingGemini">{{ savingGemini ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="geminiSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Alerts -->
+    <section class="card jv-stagger" style="animation-delay: 80ms">
+      <h3>Alerts</h3>
+      <p class="hint">Sends a Teams and/or email notification when an incident, flaky module, anomaly, or repeated pipeline failure is detected. Off by default — nothing fires until enabled here.</p>
+
+      <form (ngSubmit)="saveAlerts()">
+        <label class="checkbox-row">
+          <input type="checkbox" name="alertsEnabled" [(ngModel)]="alertsEnabled" />
+          <span>Enabled</span>
+        </label>
+        <label>
+          <span>Teams webhook URL
+            <em class="pat-state" [class.on]="teamsWebhookConfigured">{{ teamsWebhookConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="teamsWebhookUrl" [(ngModel)]="teamsWebhookUrl"
+                 [placeholder]="teamsWebhookConfigured ? '•••••••• (leave blank to keep)' : 'https://…webhook.office.com/…'" autocomplete="new-password" />
+        </label>
+        <label>
+          <span>SMTP host</span>
+          <input type="text" name="smtpHost" [(ngModel)]="smtpHost" placeholder="smtp.example.com" autocomplete="off" />
+        </label>
+        <label>
+          <span>SMTP port</span>
+          <input type="number" name="smtpPort" [(ngModel)]="smtpPort" placeholder="587" />
+        </label>
+        <label>
+          <span>SMTP username</span>
+          <input type="text" name="smtpUsername" [(ngModel)]="smtpUsername" autocomplete="off" />
+        </label>
+        <label>
+          <span>SMTP password
+            <em class="pat-state" [class.on]="smtpPasswordConfigured">{{ smtpPasswordConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="smtpPassword" [(ngModel)]="smtpPassword"
+                 [placeholder]="smtpPasswordConfigured ? '•••••••• (leave blank to keep)' : 'Password'" autocomplete="new-password" />
+        </label>
+        <label>
+          <span>From address</span>
+          <input type="text" name="smtpFrom" [(ngModel)]="smtpFrom" placeholder="jarvis@example.com" autocomplete="off" />
+        </label>
+        <label>
+          <span>To address(es)</span>
+          <input type="text" name="smtpTo" [(ngModel)]="smtpTo" placeholder="devops@example.com, oncall@example.com" autocomplete="off" />
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingAlerts">{{ savingAlerts ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="alertsSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Groq AI -->
+    <section class="card jv-stagger" style="animation-delay: 55ms">
+      <h3>Groq AI</h3>
+      <p class="hint">Free-tier AI backend (no billing required) running Llama 3.3 70B. Get a key at console.groq.com.</p>
+
+      <form (ngSubmit)="saveGroq()">
+        <label>
+          <span>Model</span>
+          <select name="groqModel" [(ngModel)]="groqModel">
+            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (default)</option>
+            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (faster/cheaper)</option>
+          </select>
+        </label>
+        <label>
+          <span>API Key
+            <em class="pat-state" [class.on]="groqApiKeyConfigured">{{ groqApiKeyConfigured ? 'configured' : 'not set' }}</em>
+          </span>
+          <input type="password" name="groqApiKey" [(ngModel)]="groqApiKey"
+                 [placeholder]="groqApiKeyConfigured ? '•••••••• (leave blank to keep)' : 'Paste Groq API key'" autocomplete="new-password" />
+        </label>
+
+        <div class="actions">
+          <button type="submit" [disabled]="savingGroq">{{ savingGroq ? 'Saving…' : 'Save' }}</button>
+          <span class="ok" *ngIf="groqSaved">Saved ✓</span>
+        </div>
+      </form>
+    </section>
+
     <!-- Ocelot importer -->
     <section class="card jv-stagger" style="animation-delay: 60ms">
       <h3>Ocelot auto-importer</h3>

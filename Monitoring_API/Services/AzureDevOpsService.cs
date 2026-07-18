@@ -409,6 +409,165 @@ public class AzureDevOpsService
         }
     }
 
+    // Deletes a build pipeline definition entirely. Irreversible on the Azure DevOps side
+    // (no undo) — this is why the chat confirm-first flow exists before ever reaching here.
+    public async Task<PipelineActionResultDto> DeleteBuildDefinitionAsync(int definitionId, string name, CancellationToken ct)
+    {
+        await LoadConfigAsync(ct);
+        if (!IsConfigured)
+        {
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = name, Ok = false, Error = "Azure DevOps credentials not configured." };
+        }
+
+        try
+        {
+            await DeleteAsync(BuildClient(), $"{EncodedProject}/_apis/build/definitions/{definitionId}?api-version={_apiVersion}", ct);
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = name, Ok = true };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Azure DevOps delete build definition failed for {DefinitionId}", definitionId);
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = name, Ok = false, Error = ex.Message };
+        }
+    }
+
+    // Renames a build pipeline definition. Azure DevOps has no partial-rename endpoint — a
+    // definition update requires GET-modify-PUT of the full definition body, including its
+    // current revision number (the API rejects a PUT with a stale revision).
+    public async Task<PipelineActionResultDto> RenameBuildDefinitionAsync(int definitionId, string oldName, string newName, CancellationToken ct)
+    {
+        await LoadConfigAsync(ct);
+        if (!IsConfigured)
+        {
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = oldName, Ok = false, Error = "Azure DevOps credentials not configured." };
+        }
+
+        try
+        {
+            var client = BuildClient();
+            var definition = await GetJsonAsync(client, $"{EncodedProject}/_apis/build/definitions/{definitionId}?api-version={_apiVersion}", ct);
+
+            using var doc = JsonDocument.Parse(definition.GetRawText());
+            var editable = new Dictionary<string, JsonElement>();
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                editable[prop.Name] = prop.Value;
+            }
+            editable["name"] = JsonSerializer.SerializeToElement(newName);
+
+            await PutJsonAsync(client, $"{EncodedProject}/_apis/build/definitions/{definitionId}?api-version={_apiVersion}", editable, ct);
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = newName, Ok = true };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Azure DevOps rename build definition failed for {DefinitionId}", definitionId);
+            return new PipelineActionResultDto { DefinitionId = definitionId, Name = oldName, Ok = false, Error = ex.Message };
+        }
+    }
+
+    // Same error-handling contract as PostJsonAsync/PatchJsonAsync, for full-body PUT updates.
+    private static async Task<JsonElement> PutJsonAsync(HttpClient client, string url, object body, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var resp = await client.PutAsync(url, content, ct);
+        var respBody = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var hint = (int)resp.StatusCode switch
+            {
+                401 or 203 => "authentication failed — check the PAT (and that it has Build: Read & execute scope).",
+                403 => "forbidden — the PAT likely lacks Build: Read & execute scope.",
+                404 => "not found — check the build definition id, organization, and project.",
+                _ => "request rejected by Azure DevOps."
+            };
+            throw new InvalidOperationException($"HTTP {(int)resp.StatusCode} {resp.StatusCode}: {hint}");
+        }
+
+        using var doc = JsonDocument.Parse(respBody);
+        return doc.RootElement.Clone();
+    }
+
+    // Same error-handling contract as the other write helpers, for HTTP DELETE calls
+    // (no response body expected on success — Azure DevOps returns 204).
+    private static async Task DeleteAsync(HttpClient client, string url, CancellationToken ct)
+    {
+        using var resp = await client.DeleteAsync(url, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var respBody = await resp.Content.ReadAsStringAsync(ct);
+            var hint = (int)resp.StatusCode switch
+            {
+                401 or 203 => "authentication failed — check the PAT (and that it has Build: Read & execute scope).",
+                403 => "forbidden — the PAT likely lacks Build: Read & execute scope.",
+                404 => "not found — check the build definition id, organization, and project.",
+                _ => "request rejected by Azure DevOps."
+            };
+            throw new InvalidOperationException($"HTTP {(int)resp.StatusCode} {resp.StatusCode}: {hint}. Body: {respBody}");
+        }
+    }
+
+    // Cancels a running/queued build (sets status to "cancelling" — Azure DevOps then stops
+    // it asynchronously; the build doesn't necessarily stop instantly on this call returning).
+    public async Task<TriggeredBuildDto> CancelBuildAsync(int buildId, CancellationToken ct)
+    {
+        await LoadConfigAsync(ct);
+        if (!IsConfigured)
+        {
+            return new TriggeredBuildDto { BuildId = buildId, Ok = false, Error = "Azure DevOps credentials not configured." };
+        }
+
+        try
+        {
+            var result = await PatchJsonAsync(BuildClient(),
+                $"{EncodedProject}/_apis/build/builds/{buildId}?api-version={_apiVersion}",
+                new { status = "cancelling" }, ct);
+
+            return new TriggeredBuildDto
+            {
+                BuildId = buildId,
+                Ok = true,
+                Status = Str(result, "status"),
+                Url = $"https://dev.azure.com/{_org}/{EncodedProject}/_build/results?buildId={buildId}"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Azure DevOps cancel build failed for build {BuildId}", buildId);
+            return new TriggeredBuildDto { BuildId = buildId, Ok = false, Error = ex.Message };
+        }
+    }
+
+    // Same error-handling contract as PostJsonAsync, for PATCH calls (cancelling a build).
+    private static async Task<JsonElement> PatchJsonAsync(HttpClient client, string url, object body, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var resp = await client.PatchAsync(url, content, ct);
+        var respBody = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var hint = (int)resp.StatusCode switch
+            {
+                401 or 203 => "authentication failed — check the PAT (and that it has Build: Read & execute scope).",
+                403 => "forbidden — the PAT likely lacks Build: Read & execute scope.",
+                404 => "not found — check the build id, organization, and project.",
+                _ => "request rejected by Azure DevOps."
+            };
+            throw new InvalidOperationException($"HTTP {(int)resp.StatusCode} {resp.StatusCode}: {hint}");
+        }
+
+        var trimmed = respBody.TrimStart();
+        if (trimmed.StartsWith("<", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Received an HTML page instead of JSON — the PAT is likely invalid/expired or lacks scope.");
+        }
+
+        using var doc = JsonDocument.Parse(respBody);
+        return doc.RootElement.Clone();
+    }
+
     // Failed-task timeline for one build — mirrors Sentinel's getBuildTimeline.
     public async Task<List<BuildErrorRecordDto>> GetBuildErrorsAsync(int buildId, CancellationToken ct)
     {

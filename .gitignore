@@ -2,12 +2,10 @@
 **/bin/
 **/obj/
 
-# Ocelot environment configs — only Dev is committed here for testing; every
-# other real environment's gateway config is intentionally excluded from
-# this repo.
+# Ocelot environment configs — excluded entirely from this branch (gateway configs
+# contain per-environment routing details not meant for this repo).
 ocelot/*.json
 ocelot/*.JSON
-!ocelot/Ocelot.Dev.json
 
 # System files
 .DS_Store

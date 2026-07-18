@@ -20,6 +20,30 @@ public static class DbSeeder
 
         await db.Database.EnsureCreatedAsync(ct);
 
+        // EnsureCreatedAsync only creates the whole schema on a brand-new database — it
+        // will NOT retrofit a newly-added table (AlertHistory) onto a database that was
+        // already provisioned before this feature existed. This idempotent DDL step
+        // covers that gap without introducing a full EF Core migrations project, which
+        // isn't warranted for a single additive table (no existing-table column changes).
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "AlertHistories" (
+                "Id" SERIAL PRIMARY KEY,
+                "Environment" VARCHAR(50) NOT NULL,
+                "Module" VARCHAR(100) NOT NULL,
+                "AlertType" VARCHAR(30) NOT NULL,
+                "DedupKey" VARCHAR(200) NOT NULL,
+                "FirstFiredAtUtc" TIMESTAMP NOT NULL,
+                "LastFiredAtUtc" TIMESTAMP NOT NULL,
+                "FireCount" INTEGER NOT NULL,
+                "ResolvedAtUtc" TIMESTAMP NULL,
+                "Summary" VARCHAR(2000) NULL,
+                "TeamsSent" BOOLEAN NOT NULL,
+                "EmailSent" BOOLEAN NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_AlertHistories_DedupKey" ON "AlertHistories" ("DedupKey");
+            CREATE INDEX IF NOT EXISTS "IX_AlertHistories_Environment_LastFiredAtUtc" ON "AlertHistories" ("Environment", "LastFiredAtUtc");
+            """, ct);
+
         if (await db.AppUsers.AnyAsync(ct))
         {
             return;

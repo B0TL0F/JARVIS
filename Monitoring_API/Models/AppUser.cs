@@ -39,3 +39,8 @@ public class CreateUserRequest
     public string Password { get; set; } = string.Empty;
     public string Role { get; set; } = Roles.Developer;
 }
+
+public class ChangeUserRoleRequest
+{
+    public string Role { get; set; } = Roles.Developer;
+}

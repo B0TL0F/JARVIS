@@ -14,8 +14,9 @@ import { MagneticDirective } from './shared/magnetic.directive';
 import { CustomCursorComponent } from './shared/custom-cursor/custom-cursor.component';
 import { JarvisBootComponent } from './shared/jarvis-boot/jarvis-boot.component';
 import { HistoryComponent } from './history/history.component';
+import { ChatComponent } from './chat/chat.component';
 
-type View = 'dashboard' | 'pipelines' | 'history' | 'targets' | 'users' | 'activity' | 'settings';
+type View = 'dashboard' | 'pipelines' | 'history' | 'targets' | 'users' | 'activity' | 'settings' | 'chat';
 
 @Component({
   selector: 'app-root',
@@ -32,7 +33,8 @@ type View = 'dashboard' | 'pipelines' | 'history' | 'targets' | 'users' | 'activ
     MagneticDirective,
     CustomCursorComponent,
     JarvisBootComponent,
-    HistoryComponent
+    HistoryComponent,
+    ChatComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'

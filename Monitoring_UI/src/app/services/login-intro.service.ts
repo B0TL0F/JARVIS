@@ -61,6 +61,7 @@ export class LoginIntroService {
     this.overlay = overlay;
 
     if (reducedMotion) {
+      this.voice.speak(this.buildGreeting(operator));
       return new Promise((resolve) => {
         setTimeout(() => {
           overlay.remove();
@@ -122,11 +123,7 @@ export class LoginIntroService {
             // Fire JARVIS's greeting the instant the label starts appearing.
             // Fire-and-forget — the visual keeps its beat even if speech is
             // unavailable/blocked/muted.
-            const name = this.friendlyName(operator);
-            const greeting = name
-              ? `Welcome back, ${name}. All systems nominal.`
-              : 'Welcome back. All systems nominal.';
-            this.voice.speak(greeting);
+            this.voice.speak(this.buildGreeting(operator));
           }
         },
         0.75
@@ -155,6 +152,13 @@ export class LoginIntroService {
       const totalNow = tl.duration() * 1000;
       if (totalNow < durationMs) tl.to({}, { duration: (durationMs - totalNow) / 1000 });
     });
+  }
+
+  private buildGreeting(operator: string): string {
+    const name = this.friendlyName(operator);
+    return name
+      ? `Welcome back, ${name}. All systems nominal.`
+      : 'Welcome back. All systems nominal.';
   }
 
   // Turn a raw operator id like "devops" or "sarah.chen" into something a

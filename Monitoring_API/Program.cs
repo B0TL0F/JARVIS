@@ -37,6 +37,7 @@ builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>
 builder.Services.AddScoped<ActivityLogger>();
 builder.Services.AddScoped<ITargetProvider, TargetProvider>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddScoped<StatusSnapshotService>();
 
 // Azure DevOps pipeline dashboard (scoped: reads runtime settings from the DB).
 builder.Services.AddHttpClient("azure", client => client.Timeout = TimeSpan.FromSeconds(15));
@@ -49,6 +50,32 @@ builder.Services.AddHostedService<OcelotWatcherHostedService>();
 
 // History/incident log + heuristic insights (stateless — pure computation over StatusChecks).
 builder.Services.AddSingleton<IncidentAnalysisService>();
+
+// AI features (Claude API). Scoped: reads the API key from runtime settings (DB) each call.
+// Short timeout — every caller has a synchronous non-AI fallback and must never block long.
+builder.Services.AddHttpClient("claude", client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<ClaudeService>();
+
+// Gemini (Google) is a second selectable AI backend — same 10s short-timeout contract.
+builder.Services.AddHttpClient("gemini", client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<GeminiService>();
+
+// Groq is a third selectable AI backend (free tier, OpenAI-compatible API).
+builder.Services.AddHttpClient("groq", client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<GroqService>();
+
+// CompositeAiService reads Ai:Provider at call time and delegates to whichever backend is
+// selected — every existing caller of IClaudeService gets both providers for free.
+builder.Services.AddScoped<IClaudeService, CompositeAiService>();
+
+// AI-triggered alert delivery (Teams + email). Fully inert until Alerts:Enabled is set via
+// Settings — runs on its own slower cadence, separate from the health-check poller.
+builder.Services.AddHttpClient("teams", client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<AlertNotificationService>();
+builder.Services.AddHostedService<AlertEvaluationHostedService>();
+
+// "Ask Jarvis" chat assistant — reuses status/incident/pipeline services, no new logic.
+builder.Services.AddScoped<ChatContextService>();
 // ------------------------------------------------------------------------------
 
 builder.Services.AddDbContext<MonitoringDbContext>(options =>

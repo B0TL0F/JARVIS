@@ -1,0 +1,51 @@
+<div class="chat-view">
+  <div class="chat-header">
+    <h2>Ask Jarvis</h2>
+    <p class="muted">Read-only AI assistant &mdash; answers only from live monitoring data{{ selectedEnvironment ? ' (' + selectedEnvironment + ')' : '' }}.</p>
+  </div>
+
+  <div class="chat-log">
+    <div *ngFor="let m of messages" class="msg" [ngClass]="m.role">
+      <div class="bubble" [ngClass]="{ warn: m.role === 'assistant' && m.configured === false }">
+        {{ m.text }}
+
+        <div class="action-row" *ngIf="m.pendingAction && !m.actionResolved">
+          <button type="button" class="confirm" [disabled]="triggering" (click)="confirmAction(m)">
+            {{ triggering ? 'Triggering…' : 'Confirm' }}
+          </button>
+          <button type="button" class="cancel" [disabled]="triggering" (click)="cancelAction(m)">Cancel</button>
+        </div>
+        <div class="action-resolved" *ngIf="m.actionResolved">
+          {{ m.actionResolved === 'confirmed' ? 'Confirmed' : 'Cancelled' }}
+        </div>
+      </div>
+    </div>
+    <div #scrollAnchor></div>
+    <div class="msg assistant" *ngIf="asking">
+      <div class="bubble thinking">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+    </div>
+  </div>
+
+  <form class="chat-input" (ngSubmit)="ask()">
+    <button
+      type="button"
+      class="mic-btn"
+      *ngIf="voiceSupported"
+      [class.listening]="listening"
+      (click)="toggleListening()"
+      [attr.aria-label]="listening ? 'Stop listening' : 'Speak your question'"
+      [attr.title]="listening ? 'Listening… click to stop' : 'Click to speak'"
+    >&#127908;</button>
+    <input
+      type="text"
+      [(ngModel)]="question"
+      name="question"
+      placeholder="e.g. Trigger the Export_API build on branch main"
+      [disabled]="asking"
+      autocomplete="off"
+    />
+    <button type="submit" [disabled]="asking || !question.trim()">Ask</button>
+  </form>
+</div>

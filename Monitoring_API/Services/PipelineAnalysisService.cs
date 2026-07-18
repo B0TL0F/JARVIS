@@ -114,6 +114,48 @@ public class PipelineAnalysisService
 
     public static bool ShouldAlert(int consecutiveFailures) => consecutiveFailures >= ConsecutiveFailureAlertThreshold;
 
+    private static string BuildTemplateSummary(BuildInsightDto insight) =>
+        $"{insight.Name}: {insight.SuccessRate7d}% success (7d), " +
+        $"{insight.ConsecutiveFailures} consecutive failure(s), trend {insight.Trend}" +
+        (insight.IsFlaky ? ", flaky" : "") +
+        (insight.IsDurationAnomalous ? ", duration anomaly detected" : "") + ".";
+
+    // AI-enriched build insight narrative. Grounded in the already-computed statistical
+    // flags plus the build's own error timeline (fetched by the caller) — falls back
+    // silently to a plain template sentence when no Claude key is configured or the
+    // call fails/times out.
+    public async Task<string> SummarizeBuildAsync(BuildInsightDto insight, IReadOnlyList<BuildErrorRecordDto> errors, IClaudeService claude, CancellationToken ct = default)
+    {
+        var template = BuildTemplateSummary(insight);
+
+        var errorLines = errors.Count == 0
+            ? "none captured"
+            : string.Join("; ", errors.SelectMany(e => e.Issues.Select(i => i.Message))
+                .Where(m => !string.IsNullOrWhiteSpace(m)).Take(5));
+
+        var context = $"""
+            Pipeline: {insight.Name}
+            Success rate (7d): {insight.SuccessRate7d}%
+            Success rate (30d): {insight.SuccessRate30d}%
+            Consecutive failures: {insight.ConsecutiveFailures}
+            Flaky (flip count {insight.FlipCount} in window): {insight.IsFlaky}
+            Trend: {insight.Trend}
+            Duration anomaly: {insight.IsDurationAnomalous} (latest {insight.LatestDurationMinutes} min vs baseline {insight.BaselineDurationMinutes} min)
+            Recent build error messages: {errorLines}
+            """;
+
+        var text = await claude.CompleteAsync(
+            systemPrompt: "You are a DevOps assistant writing CI/CD pipeline health summaries for a monitoring " +
+                          "dashboard. Given structured build-pipeline statistics and any captured error messages, " +
+                          "write ONE concise plain-English sentence describing the pipeline's likely health issue " +
+                          "and probable cause. Do not invent facts not present in the data. No preamble.",
+            userPrompt: context,
+            maxTokens: 200,
+            ct: ct);
+
+        return string.IsNullOrWhiteSpace(text) ? template : text.Trim();
+    }
+
     private static bool IsSuccess(BuildHistoryItem b) => b.Result == "succeeded";
 
     private static double SuccessRate(IReadOnlyList<BuildHistoryItem> builds) =>

@@ -1,30 +1,30 @@
 services:
-  monitoring-db:
+  monitoring-ai-db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: monitoring
       POSTGRES_USER: monitoring
-      POSTGRES_PASSWORD: ${MONITORING_DB_PASSWORD:-monitoring}
+      POSTGRES_PASSWORD: ${MONITORING_AI_DB_PASSWORD:-monitoring}
     volumes:
-      - monitoring-db-data:/var/lib/postgresql/data
+      - monitoring-ai-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U monitoring -d monitoring"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  monitoring-api:
+  monitoring-ai-api:
     build:
       context: ./Monitoring_API
     environment:
       ASPNETCORE_ENVIRONMENT: QA
-      ConnectionStrings__MonitoringDb: "Host=monitoring-db;Database=monitoring;Username=monitoring;Password=${MONITORING_DB_PASSWORD:-monitoring}"
+      ConnectionStrings__MonitoringDb: "Host=monitoring-ai-db;Database=monitoring;Username=monitoring;Password=${MONITORING_AI_DB_PASSWORD:-monitoring}"
       # Local-verification-only default credentials — override via env vars
-      # (MONITORING_BASIC_AUTH_USER / MONITORING_BASIC_AUTH_PASSWORD) or change
+      # (MONITORING_AI_BASIC_AUTH_USER / MONITORING_AI_BASIC_AUTH_PASSWORD) or change
       # these before this ever runs anywhere shared (self-hosted agent, etc.).
-      BasicAuth__Username: ${MONITORING_BASIC_AUTH_USER:-devops}
-      BasicAuth__Password: ${MONITORING_BASIC_AUTH_PASSWORD:-Cargo-Watch-2026!}
-      Cors__AllowedOrigins__0: "http://localhost:8081"
+      BasicAuth__Username: ${MONITORING_AI_BASIC_AUTH_USER:-devops}
+      BasicAuth__Password: ${MONITORING_AI_BASIC_AUTH_PASSWORD:-Cargo-Watch-2026!}
+      Cors__AllowedOrigins__0: "http://localhost:8091"
       # Azure DevOps pipeline dashboard (Sentinel-ported). Leave blank to disable —
       # the /api/pipelines endpoint then returns { ok:false, msg:"...not configured" }.
       AzureDevOps__Org: ${AZURE_DEVOPS_ORG:-}
@@ -33,24 +33,37 @@ services:
       AzureDevOps__ApiVersion: ${AZURE_DEVOPS_API_VERSION:-7.1}
       # Ocelot auto-importer watches this directory (bind-mounted below).
       Ocelot__Directory: /app/ocelot
+      # Claude API (AI features) — blank disables AI enrichment gracefully (falls back to
+      # heuristic templates); set via Settings UI at runtime instead, this is just a fallback.
+      Claude__ApiKey: ${CLAUDE_API_KEY:-}
+      Claude__Model: ${CLAUDE_MODEL:-claude-opus-4-8}
+      # Alerts (Teams webhook + SMTP) — disabled by default, configure via Settings UI.
+      Alerts__Enabled: ${ALERTS_ENABLED:-false}
+      Alerts__TeamsWebhookUrl: ${ALERTS_TEAMS_WEBHOOK_URL:-}
+      Alerts__Smtp__Host: ${ALERTS_SMTP_HOST:-}
+      Alerts__Smtp__Port: ${ALERTS_SMTP_PORT:-587}
+      Alerts__Smtp__Username: ${ALERTS_SMTP_USERNAME:-}
+      Alerts__Smtp__Password: ${ALERTS_SMTP_PASSWORD:-}
+      Alerts__Smtp__From: ${ALERTS_SMTP_FROM:-}
+      Alerts__Smtp__To: ${ALERTS_SMTP_TO:-}
     depends_on:
-      monitoring-db:
+      monitoring-ai-db:
         condition: service_healthy
     expose:
       - "8080"
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
       # Drop an Ocelot gateway JSON here to auto-create monitored targets.
       - ./ocelot:/app/ocelot
 
-  monitoring-ui:
+  monitoring-ai-ui:
     build:
       context: ./Monitoring_UI
     depends_on:
-      - monitoring-api
+      - monitoring-ai-api
     ports:
-      - "8081:8080"
+      - "8091:8080"
 
 volumes:
-  monitoring-db-data:
+  monitoring-ai-db-data:

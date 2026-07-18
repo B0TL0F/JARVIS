@@ -78,6 +78,38 @@ public class IncidentAnalysisService
         return incidents.OrderByDescending(i => i.StartedAtUtc).ToList();
     }
 
+    // AI-enriched version of the incident summary: same fallback template as
+    // Summarize(), but tries a Claude-generated one-sentence explanation first.
+    // Grounded strictly in the incident's own fields — the prompt instructs
+    // Claude not to invent facts not present in the data. Falls back silently
+    // (no API key configured, timeout, HTTP error) to the deterministic template.
+    public async Task<string> SummarizeAsync(IncidentDto incident, IClaudeService claude, CancellationToken ct = default)
+    {
+        var template = Summarize(incident, 0);
+
+        var context = $"""
+            Module: {incident.Module}
+            Check type: {(incident.CheckType == CheckType.Api ? "API check" : "DB check")}
+            Started (UTC): {incident.StartedAtUtc:o}
+            Resolved (UTC): {(incident.ResolvedAtUtc?.ToString("o") ?? "still ongoing")}
+            Duration (minutes): {incident.DurationMinutes}
+            HTTP status code: {(incident.HttpStatusCode?.ToString() ?? "none captured")}
+            Error message: {(string.IsNullOrWhiteSpace(incident.ErrorMessage) ? "none captured" : incident.ErrorMessage)}
+            Sample count during outage: {incident.SampleCount}
+            """;
+
+        var text = await claude.CompleteAsync(
+            systemPrompt: "You are an SRE assistant writing on-call incident summaries for a monitoring dashboard. " +
+                          "Given structured incident data, write ONE concise plain-English sentence describing the " +
+                          "likely cause and impact. Do not invent facts not present in the data — if the error " +
+                          "message is generic or missing, say so rather than guessing a specific cause. No preamble.",
+            userPrompt: context,
+            maxTokens: 200,
+            ct: ct);
+
+        return string.IsNullOrWhiteSpace(text) ? template : text.Trim();
+    }
+
     // IST is a fixed +05:30 offset with no daylight saving, so a plain TimeSpan
     // add is correct and avoids depending on the container having IANA tzdata
     // for a TimeZoneInfo lookup.

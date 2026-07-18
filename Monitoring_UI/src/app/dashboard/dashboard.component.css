@@ -315,6 +315,37 @@
   color: var(--muted);
 }
 
+.check-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.check-badge {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  background: var(--surface-raised);
+  cursor: default;
+}
+.check-badge.up {
+  color: var(--signal-up);
+  border-color: rgba(0, 255, 136, 0.35);
+}
+.check-badge.down {
+  color: var(--signal-down);
+  border-color: rgba(255, 51, 102, 0.45);
+  background: rgba(255, 51, 102, 0.08);
+}
+.check-badge.na {
+  opacity: 0.5;
+}
+
 .hud-empty {
   font-family: var(--mono);
   font-size: 0.78rem;

@@ -48,6 +48,14 @@ input {
 }
 input:focus { border-color: rgba(255, 43, 43, 0.55); box-shadow: 0 0 0 3px var(--accent-soft); }
 
+select {
+  font: inherit; padding: 10px 14px; border-radius: var(--radius-sm); color: var(--text);
+  background: var(--surface-raised); border: 1px solid var(--border); outline: none;
+}
+
+.checkbox-row { flex-direction: row; align-items: center; gap: .5rem; }
+.checkbox-row input[type="checkbox"] { width: auto; padding: 0; }
+
 .pat-state {
   font-style: normal; font-size: .66rem; text-transform: uppercase; letter-spacing: .06em;
   padding: .1rem .45rem; border-radius: 999px; background: var(--accent-soft); color: var(--muted);

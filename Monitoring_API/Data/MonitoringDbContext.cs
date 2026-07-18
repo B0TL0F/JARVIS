@@ -14,6 +14,7 @@ public class MonitoringDbContext : DbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<ImportedTarget> ImportedTargets => Set<ImportedTarget>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<AlertHistory> AlertHistories => Set<AlertHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -62,6 +63,21 @@ public class MonitoringDbContext : DbContext
         {
             entity.HasKey(e => e.Key);
             entity.Property(e => e.Key).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<AlertHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Environment).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Module).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.AlertType).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.DedupKey).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Summary).HasMaxLength(2000);
+            // Not unique: DedupKey identifies one *ongoing* condition (ResolvedAtUtc IS NULL),
+            // but a resolved condition can recur later as a fresh row with the same key —
+            // application logic (AlertNotificationService) enforces "at most one open row per key".
+            entity.HasIndex(e => e.DedupKey);
+            entity.HasIndex(e => new { e.Environment, e.LastFiredAtUtc });
         });
     }
 }

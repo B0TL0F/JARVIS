@@ -13,15 +13,22 @@ namespace Monitoring_API.Controllers;
 [Route("api/history")]
 public class HistoryController : ControllerBase
 {
+    // Only the most recent incidents get an AI-generated narrative — bounds worst-case
+    // latency to ~one Claude call's timeout instead of serial calls across the whole
+    // historical backlog on every page load.
+    private const int AiSummaryEnrichmentLimit = 10;
+
     private readonly MonitoringDbContext _db;
     private readonly ITargetProvider _targetProvider;
     private readonly IncidentAnalysisService _analysis;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public HistoryController(MonitoringDbContext db, ITargetProvider targetProvider, IncidentAnalysisService analysis)
+    public HistoryController(MonitoringDbContext db, ITargetProvider targetProvider, IncidentAnalysisService analysis, IServiceScopeFactory scopeFactory)
     {
         _db = db;
         _targetProvider = targetProvider;
         _analysis = analysis;
+        _scopeFactory = scopeFactory;
     }
 
     [HttpGet("incidents")]
@@ -44,6 +51,21 @@ public class HistoryController : ControllerBase
             .SelectMany(g => _analysis.ComputeIncidents(g.Key.ServiceName, g.Key.CheckType, g.ToList()))
             .OrderByDescending(i => i.StartedAtUtc)
             .ToList();
+
+        // Enrich only the most recent handful with an AI-generated narrative, in parallel.
+        // Each branch resolves its own DI scope (and thus its own MonitoringDbContext) —
+        // EF Core's DbContext is not thread-safe, so parallel branches must never share one
+        // (sharing it throws "A second operation was started on this context instance").
+        // Falls back to the existing template summary automatically (SummarizeAsync never
+        // throws) when no AI key is configured or the call fails/times out.
+        var toEnrich = incidents.Take(AiSummaryEnrichmentLimit).ToList();
+        await Task.WhenAll(toEnrich.Select(async incident =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var scopedAnalysis = scope.ServiceProvider.GetRequiredService<IncidentAnalysisService>();
+            var scopedClaude = scope.ServiceProvider.GetRequiredService<IClaudeService>();
+            incident.Summary = await scopedAnalysis.SummarizeAsync(incident, scopedClaude, ct);
+        }));
 
         return Ok(incidents);
     }

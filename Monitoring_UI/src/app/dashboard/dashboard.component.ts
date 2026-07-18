@@ -105,6 +105,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return check.isUp ? 'up' : 'down';
   }
 
+  checkTooltip(label: string, check: ServiceStatus['api']): string {
+    if (!check) return `${label}: no data`;
+    const parts = [`${label}: ${check.isUp ? 'UP' : 'DOWN'}`];
+    if (check.httpStatusCode !== null) parts.push(`HTTP ${check.httpStatusCode}`);
+    if (check.responseTimeMs !== null) parts.push(`${check.responseTimeMs}ms`);
+    if (check.errorMessage) parts.push(check.errorMessage);
+    if (check.timestampUtc) parts.push(`as of ${check.timestampUtc}`);
+    return parts.join(' · ');
+  }
+
   insightFor(module: string): ModuleInsight | null {
     return this.insightsByModule[module] ?? null;
   }

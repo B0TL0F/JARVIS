@@ -120,6 +120,7 @@ public class BuildInsightDto
     public double? BaselineDurationMinutes { get; set; }
     public int ConsecutiveFailures { get; set; }
     public string Trend { get; set; } = "stable"; // "improving" | "stable" | "degrading"
+    public string? Summary { get; set; }
 }
 
 // DORA-style metrics for one release pipeline definition, computed directly
@@ -154,5 +155,21 @@ public class TriggeredBuildDto
     public string? BuildNumber { get; set; }
     public string? Status { get; set; }
     public string? Url { get; set; }
+    public string? Error { get; set; }
+}
+
+// Result of a pipeline-definition mutation (delete or rename) — a build definition,
+// not a build run, so it has no BuildId/BuildNumber/Status like TriggeredBuildDto.
+public class RenamePipelineRequest
+{
+    public string? OldName { get; set; }
+    public string NewName { get; set; } = string.Empty;
+}
+
+public class PipelineActionResultDto
+{
+    public int DefinitionId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool Ok { get; set; }
     public string? Error { get; set; }
 }

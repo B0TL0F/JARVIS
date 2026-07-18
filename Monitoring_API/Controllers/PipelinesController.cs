@@ -16,12 +16,14 @@ public class PipelinesController : ControllerBase
     private readonly AzureDevOpsService _azure;
     private readonly PipelineAnalysisService _analysis;
     private readonly ActivityLogger _activity;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public PipelinesController(AzureDevOpsService azure, PipelineAnalysisService analysis, ActivityLogger activity)
+    public PipelinesController(AzureDevOpsService azure, PipelineAnalysisService analysis, ActivityLogger activity, IServiceScopeFactory scopeFactory)
     {
         _azure = azure;
         _analysis = analysis;
         _activity = activity;
+        _scopeFactory = scopeFactory;
     }
 
     private bool RequireAdmin(out ActionResult? forbid)
@@ -77,16 +79,41 @@ public class PipelinesController : ControllerBase
         var activeBuildDefs = dashboard.BuildPipelines.Where(d => d.RecentBuilds.Count > 0).ToList();
         var activeReleaseDefs = dashboard.ReleasePipelines.Where(d => d.RecentReleases.Count > 0).ToList();
 
+        // Each bounded task resolves its own DI scope (own MonitoringDbContext, own
+        // AzureDevOpsService/IClaudeService instances) — AzureDevOpsService and
+        // CompositeAiService both read settings via a scoped DbContext, which is not
+        // thread-safe; sharing one instance across these concurrent tasks throws
+        // "A second operation was started on this context instance".
         var buildInsightTasks = activeBuildDefs.Select(def => Bounded(async () =>
         {
-            var history = await _azure.GetBuildHistoryAsync(def.Id, days: 30, ct);
-            return _analysis.ComputeBuildInsight(def.Id, def.Name, history);
+            using var scope = _scopeFactory.CreateScope();
+            var scopedAzure = scope.ServiceProvider.GetRequiredService<AzureDevOpsService>();
+            var scopedAnalysis = scope.ServiceProvider.GetRequiredService<PipelineAnalysisService>();
+            var scopedClaude = scope.ServiceProvider.GetRequiredService<IClaudeService>();
+
+            var history = await scopedAzure.GetBuildHistoryAsync(def.Id, days: 30, ct);
+            var insight = scopedAnalysis.ComputeBuildInsight(def.Id, def.Name, history);
+
+            // Only spend an AI call on pipelines actually showing a problem —
+            // healthy pipelines keep the (empty) fallback and skip the AI call entirely.
+            if (insight.IsFlaky || insight.IsDurationAnomalous || insight.ConsecutiveFailures > 0)
+            {
+                var latestBuildId = history.OrderByDescending(b => b.FinishTime).FirstOrDefault()?.Id;
+                var errors = latestBuildId is int bid ? await scopedAzure.GetBuildErrorsAsync(bid, ct) : new List<BuildErrorRecordDto>();
+                insight.Summary = await scopedAnalysis.SummarizeBuildAsync(insight, errors, scopedClaude, ct);
+            }
+
+            return insight;
         }));
 
         var releaseInsightTasks = activeReleaseDefs.Select(def => Bounded(async () =>
         {
-            var history = await _azure.GetReleaseHistoryAsync(def.Id, days: 30, ct);
-            return _analysis.ComputeReleaseInsight(def.Id, def.Name, history);
+            using var scope = _scopeFactory.CreateScope();
+            var scopedAzure = scope.ServiceProvider.GetRequiredService<AzureDevOpsService>();
+            var scopedAnalysis = scope.ServiceProvider.GetRequiredService<PipelineAnalysisService>();
+
+            var history = await scopedAzure.GetReleaseHistoryAsync(def.Id, days: 30, ct);
+            return scopedAnalysis.ComputeReleaseInsight(def.Id, def.Name, history);
         }));
 
         var buildInsights = await Task.WhenAll(buildInsightTasks);
@@ -129,5 +156,61 @@ public class PipelinesController : ControllerBase
         }
 
         return Ok(results);
+    }
+
+    // Cancels a running/queued build. Admin-only, mirrors the trigger endpoint's audit-log
+    // pattern. Azure DevOps processes cancellation asynchronously — a successful response here
+    // means cancellation was requested, not that the build has necessarily stopped yet.
+    [HttpPost("build/{buildId:int}/cancel")]
+    public async Task<ActionResult<TriggeredBuildDto>> CancelBuild(int buildId, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        var result = await _azure.CancelBuildAsync(buildId, ct);
+
+        var detail = result.Ok
+            ? $"Requested cancellation of build #{buildId} (status now '{result.Status}')"
+            : $"Failed to cancel build #{buildId}: {result.Error}";
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "pipeline.cancel", detail, BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return Ok(result);
+    }
+
+    // Deletes a build pipeline definition entirely. Admin-only, irreversible on the Azure
+    // DevOps side — the chat confirm-first flow (and this endpoint's own admin gate) are the
+    // only safeguards before this actually removes the pipeline.
+    [HttpDelete("definitions/{definitionId:int}")]
+    public async Task<ActionResult<PipelineActionResultDto>> DeleteDefinition(int definitionId, [FromQuery] string? name, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        var result = await _azure.DeleteBuildDefinitionAsync(definitionId, name ?? $"#{definitionId}", ct);
+
+        var detail = result.Ok
+            ? $"Deleted pipeline definition '{result.Name}' (#{definitionId})"
+            : $"Failed to delete pipeline definition #{definitionId}: {result.Error}";
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "pipeline.delete", detail, BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return Ok(result);
+    }
+
+    // Renames a build pipeline definition. Admin-only.
+    [HttpPut("definitions/{definitionId:int}/rename")]
+    public async Task<ActionResult<PipelineActionResultDto>> RenameDefinition(int definitionId, [FromBody] RenamePipelineRequest req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+        if (string.IsNullOrWhiteSpace(req.NewName)) return BadRequest(new { error = "New name is required." });
+
+        var result = await _azure.RenameBuildDefinitionAsync(definitionId, req.OldName ?? $"#{definitionId}", req.NewName.Trim(), ct);
+
+        var detail = result.Ok
+            ? $"Renamed pipeline definition #{definitionId} to '{result.Name}'"
+            : $"Failed to rename pipeline definition #{definitionId}: {result.Error}";
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "pipeline.rename", detail, BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return Ok(result);
     }
 }

@@ -38,6 +38,7 @@
           <nav class="nav-dropdown" *ngIf="menuOpen">
             <button class="navtab" [class.active]="view === 'pipelines'" (click)="go('pipelines')">Pipelines</button>
             <button class="navtab" [class.active]="view === 'history'" (click)="go('history')">History</button>
+            <button class="navtab" [class.active]="view === 'chat'" (click)="go('chat')">Ask Jarvis</button>
             <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'targets'" (click)="go('targets')">Targets</button>
             <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'users'" (click)="go('users')">Users</button>
             <button class="navtab" *ngIf="auth.isAdmin()" [class.active]="view === 'activity'" (click)="go('activity')">Activity</button>
@@ -51,6 +52,7 @@
       <app-dashboard *ngIf="view === 'dashboard'"></app-dashboard>
       <app-pipelines *ngIf="view === 'pipelines'"></app-pipelines>
       <app-history *ngIf="view === 'history'"></app-history>
+      <app-chat *ngIf="view === 'chat'"></app-chat>
       <app-targets *ngIf="view === 'targets' && auth.isAdmin()"></app-targets>
       <app-users *ngIf="view === 'users' && auth.isAdmin()"></app-users>
       <app-activity *ngIf="view === 'activity' && auth.isAdmin()"></app-activity>

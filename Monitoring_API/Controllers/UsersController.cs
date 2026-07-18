@@ -124,4 +124,36 @@ public class UsersController : ControllerBase
 
         return NoContent();
     }
+
+    // Changes an existing user's role. Admin-only. Same last-admin protection as delete —
+    // demoting the last remaining admin would lock everyone out of user management.
+    [HttpPut("users/{id:int}/role")]
+    public async Task<ActionResult<UserDto>> ChangeRole(int id, [FromBody] ChangeUserRoleRequest req, CancellationToken ct)
+    {
+        if (!CurrentUser.IsAdmin(User))
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "Admin role required." });
+
+        if (!Roles.IsValid(req.Role))
+        {
+            return BadRequest(new { error = "Role must be 'admin' or 'developer'." });
+        }
+
+        var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null) return NotFound();
+
+        if (user.Role == Roles.Admin && req.Role != Roles.Admin
+            && await _db.AppUsers.CountAsync(u => u.Role == Roles.Admin, ct) <= 1)
+        {
+            return BadRequest(new { error = "Cannot demote the last admin account." });
+        }
+
+        var oldRole = user.Role;
+        user.Role = req.Role;
+        await _db.SaveChangesAsync(ct);
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "user.role-change", $"Changed '{user.Username}' role from {oldRole} to {user.Role}", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return Ok(new UserDto { Id = user.Id, Username = user.Username, Role = user.Role, CreatedAtUtc = user.CreatedAtUtc });
+    }
 }
