@@ -309,6 +309,14 @@ h1 {
   position: relative;
 }
 
+.app-footer {
+  text-align: center;
+  padding: 16px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
 @media (max-width: 640px) {
   .app { padding: 20px 16px 40px; }
   header { gap: 12px; }

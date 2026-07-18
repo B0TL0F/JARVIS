@@ -43,11 +43,23 @@ public class ChatContextService
     public async Task<string> BuildContextAsync(string? environment, CancellationToken ct, bool minimal = false)
     {
         var sb = new StringBuilder();
+        // Fixed +5:30 offset (IST has no DST) — avoids depending on the tzdata package, which
+        // isn't installed in the aspnet runtime base image.
+        var istNow = DateTime.UtcNow.AddHours(5).AddMinutes(30);
+        sb.AppendLine($"Current date/time (IST): {istNow:yyyy-MM-dd HH:mm:ss} IST");
+        sb.AppendLine();
         var environments = await _targetProvider.GetEnvironmentsAsync(ct);
 
+        // Exact match first; if none, fall back to a PREFIX match (e.g. "PROD" matching
+        // PROD_BUD/PROD_CES/PROD_ACS/...) so "what failed in PROD this week" resolves across
+        // every environment sharing that prefix, not just an exact env name.
         var scoped = string.IsNullOrWhiteSpace(environment)
             ? environments
             : environments.Where(e => string.Equals(e.Name, environment, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (scoped.Count == 0 && !string.IsNullOrWhiteSpace(environment))
+        {
+            scoped = environments.Where(e => e.Name.StartsWith(environment, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
 
         if (scoped.Count == 0)
         {
@@ -55,11 +67,12 @@ public class ChatContextService
             return sb.ToString();
         }
 
-        // When a specific environment is requested, give full per-module detail (small, bounded
-        // to one environment). When scoped across all ~30 environments, a full per-module dump
-        // is tens of thousands of tokens — too large for tighter free-tier providers (e.g. Groq).
-        // In that case, only surface DOWN modules plus a healthy-count summary.
-        var singleEnvironment = !string.IsNullOrWhiteSpace(environment);
+        // When a specific environment (or a small prefix-matched group, e.g. "PROD" -> 5 envs)
+        // is requested, give full per-module detail. When scoped across all ~30 environments, a
+        // full per-module dump is tens of thousands of tokens — too large for tighter free-tier
+        // providers (e.g. Groq). In that case, only surface DOWN modules plus a healthy-count summary.
+        const int MaxEnvironmentsForFullDetail = 5;
+        var singleEnvironment = !string.IsNullOrWhiteSpace(environment) && scoped.Count <= MaxEnvironmentsForFullDetail;
 
         // Hard cap on individually-listed down modules across an unscoped (all-environments)
         // query — this sandbox alone can have hundreds of down modules (unreachable test
@@ -67,6 +80,11 @@ public class ChatContextService
         // exceeding free-tier provider limits (e.g. Groq's 6K TPM). A single-environment
         // question is never capped — it's already small.
         const int MaxDownModulesListed = 25;
+
+        // Full per-module dump only for exactly one environment — a prefix match like "PROD"
+        // (up to MaxEnvironmentsForFullDetail environments) still gets down-only + a count
+        // summary here, same as the fully-unscoped path, just narrowed to the matched group.
+        var showAllModules = scoped.Count == 1;
 
         sb.AppendLine("=== CURRENT MODULE STATUS ===");
         var downCount = 0;
@@ -88,17 +106,17 @@ public class ChatContextService
                     downEnvNames.Add(env.Name);
                 }
 
-                var shouldList = singleEnvironment || (isDown && downListed < MaxDownModulesListed);
+                var shouldList = showAllModules || (isDown && downListed < MaxDownModulesListed);
                 if (shouldList)
                 {
                     var apiState = m.Api is null ? "n/a" : (m.Api.IsUp ? "UP" : $"DOWN ({m.Api.ErrorMessage})");
                     var dbState = m.Db is null ? "n/a" : (m.Db.IsUp ? "UP" : $"DOWN ({m.Db.ErrorMessage})");
                     sb.AppendLine($"{env.Name} / {m.Module}: API={apiState}, DB={dbState}, uptime24h={m.UptimePercent24h}%");
-                    if (!singleEnvironment && isDown) downListed++;
+                    if (!showAllModules && isDown) downListed++;
                 }
             }
         }
-        if (!singleEnvironment)
+        if (!showAllModules)
         {
             if (downCount > downListed)
             {
@@ -123,6 +141,10 @@ public class ChatContextService
         }
         else
         {
+            // Per-environment cap shrinks as more environments are in scope (e.g. a "PROD"
+            // prefix match pulling in 5 environments at once) — a flat Take(10) per environment
+            // multiplies into an oversized prompt once scoped.Count > 1.
+            var incidentsPerEnv = Math.Max(2, 10 / scoped.Count);
             var since = DateTime.UtcNow.AddDays(-7);
             foreach (var env in scoped)
             {
@@ -136,7 +158,7 @@ public class ChatContextService
                     .GroupBy(c => (c.ServiceName, c.CheckType))
                     .SelectMany(g => _incidentAnalysis.ComputeIncidents(g.Key.ServiceName, g.Key.CheckType, g.ToList()))
                     .OrderByDescending(i => i.StartedAtUtc)
-                    .Take(10)
+                    .Take(incidentsPerEnv)
                     .ToList();
 
                 if (incidents.Count == 0)
@@ -147,6 +169,35 @@ public class ChatContextService
                 {
                     sb.AppendLine($"{env.Name} / {i.Module}: {i.Summary}");
                 }
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("=== RECENT ALERTS (last 7 days) ===");
+        // Same single/small-environment-only scoping as incidents above — lets "why did this
+        // alert fire" / "explain this alert" questions be answered from real AlertHistory rows.
+        if (!singleEnvironment)
+        {
+            sb.AppendLine("Alert detail is only pulled for a specific environment — ask about one to see it.");
+        }
+        else
+        {
+            var since7d = DateTime.UtcNow.AddDays(-7);
+            var envNames = scoped.Select(e => e.Name).ToList();
+            var alerts = await _db.AlertHistories
+                .Where(a => envNames.Contains(a.Environment) && a.LastFiredAtUtc >= since7d)
+                .OrderByDescending(a => a.LastFiredAtUtc)
+                .Take(20)
+                .ToListAsync(ct);
+
+            if (alerts.Count == 0)
+            {
+                sb.AppendLine("No alerts fired in the last 7 days for this scope.");
+            }
+            foreach (var a in alerts)
+            {
+                var state = a.ResolvedAtUtc is null ? "still open" : $"resolved at {a.ResolvedAtUtc:yyyy-MM-dd HH:mm} UTC";
+                sb.AppendLine($"{a.Environment} / {a.Module} [{a.AlertType}]: {a.Summary} (fired {a.FireCount}x, first {a.FirstFiredAtUtc:yyyy-MM-dd HH:mm} UTC, {state})");
             }
         }
 
@@ -195,6 +246,37 @@ public class ChatContextService
     public async Task<List<ImportedTarget>> GetTargetsCatalogAsync(CancellationToken ct)
     {
         return await _db.ImportedTargets.AsNoTracking().OrderBy(t => t.Environment).ThenBy(t => t.Module).ToListAsync(ct);
+    }
+
+    // Every real environment name — used by ChatController to detect an environment (or a
+    // shared prefix like "PROD") mentioned in free-text chat questions, so BuildContextAsync
+    // can be scoped without requiring the dashboard's environment dropdown to be set.
+    public async Task<List<string>> GetEnvironmentNamesAsync(CancellationToken ct)
+    {
+        var environments = await _targetProvider.GetEnvironmentsAsync(ct);
+        return environments.Select(e => e.Name).ToList();
+    }
+
+    // Used by the create_remediation_rule tool to validate (environment, module) against every
+    // actually-monitored module — not just manual ImportedTarget overrides, since most modules
+    // come from config/targets.json instead.
+    public async Task<List<(string Environment, string Module)>> GetMonitoredModulesCatalogAsync(CancellationToken ct)
+    {
+        var environments = await _targetProvider.GetEnvironmentsAsync(ct);
+        return environments
+            .SelectMany(e => e.Targets.Select(t => (Environment: e.Name, Module: t.Module)))
+            .Distinct()
+            .OrderBy(x => x.Environment).ThenBy(x => x.Module)
+            .ToList();
+    }
+
+    // Read-only listing for "what remediation rules exist" questions — no tool/confirm needed
+    // since nothing is mutated, just fed into the prompt like the pipeline/target/user catalogs.
+    public async Task<List<RemediationRule>> GetRemediationRulesCatalogAsync(CancellationToken ct)
+    {
+        return await _db.RemediationRules.AsNoTracking()
+            .OrderBy(r => r.Environment).ThenBy(r => r.Module)
+            .ToListAsync(ct);
     }
 
     // Used the same way for the user-management tools (delete/change-role) — never for

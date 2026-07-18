@@ -38,6 +38,12 @@ public static class SettingKeys
     public const string AlertsSmtpPassword = "Alerts:Smtp:Password";
     public const string AlertsSmtpFrom = "Alerts:Smtp:From";
     public const string AlertsSmtpTo = "Alerts:Smtp:To";
+
+    // Master switch for auto-remediation — default "false" (fail-safe off). Per-rule mapping
+    // (which pipeline fixes which environment/module) lives in RemediationRule rows, not here.
+    public const string AutoRemediationEnabled = "AutoRemediation:Enabled";
+    // Default "true" (fail toward safe) — logs what WOULD be triggered without calling Azure DevOps.
+    public const string AutoRemediationDryRun = "AutoRemediation:DryRun";
 }
 
 // What the settings page shows/saves for Azure DevOps. The PAT is write-only:
@@ -137,4 +143,18 @@ public class AlertSettingsUpdate
     public string? SmtpPassword { get; set; }
     public string? SmtpFrom { get; set; }
     public string? SmtpTo { get; set; }
+}
+
+// Master switch + dry-run flag for auto-remediation. Per-(environment, module) mapping to a
+// build pipeline lives in RemediationRule rows, exposed separately via /api/settings/remediation-rules.
+public class AutoRemediationSettingsDto
+{
+    public bool Enabled { get; set; }
+    public bool DryRun { get; set; }
+}
+
+public class AutoRemediationSettingsUpdate
+{
+    public bool Enabled { get; set; }
+    public bool DryRun { get; set; }
 }

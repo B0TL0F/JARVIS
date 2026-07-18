@@ -58,26 +58,65 @@ public class ChatController : ControllerBase
 
         var isAdmin = CurrentUser.IsAdmin(User);
 
+        // Prefer the dashboard's environment dropdown when set; otherwise try to detect one
+        // (exact name or a shared prefix like "PROD") mentioned in the question text itself, so
+        // "what failed in PROD this week" resolves without requiring the dropdown to be set.
+        var effectiveEnvironment = string.IsNullOrWhiteSpace(req.Environment)
+            ? await DetectEnvironmentFromQuestionAsync(req.Question, ct)
+            : req.Environment;
+
         if (!isAdmin)
         {
-            var liveData = await _context.BuildContextAsync(req.Environment, ct);
+            var liveData = await _context.BuildContextAsync(effectiveEnvironment, ct);
             return Ok(await AskReadOnlyAsync(liveData, req.Question, ct));
         }
 
         // Admin tool-enabled path already sends pipeline/target/user catalogs plus up to 11
         // tool schemas — use the minimal (status-only) context to leave room under tighter
         // free-tier provider budgets.
-        var minimalLiveData = await _context.BuildContextAsync(req.Environment, ct, minimal: true);
+        var minimalLiveData = await _context.BuildContextAsync(effectiveEnvironment, ct, minimal: true);
         return Ok(await AskWithToolsAsync(minimalLiveData, req.Question, ct));
+    }
+
+    // Exact environment name wins (longest match, so "QATEST" isn't matched by "QA"); otherwise
+    // falls back to a shared prefix (e.g. "PROD" from "PROD_BUD"/"PROD_CES"/...) mentioned in the
+    // question, so ChatContextService.BuildContextAsync's own prefix-matching can pick up several
+    // related environments at once. Returns null (unscoped) if nothing is mentioned.
+    private async Task<string?> DetectEnvironmentFromQuestionAsync(string question, CancellationToken ct)
+    {
+        var envNames = await _context.GetEnvironmentNamesAsync(ct);
+
+        var exact = envNames.Where(e => question.Contains(e, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(e => e.Length)
+            .FirstOrDefault();
+        if (exact is not null) return exact;
+
+        var prefixes = envNames.Select(e => e.Split('_')[0]).Distinct(StringComparer.OrdinalIgnoreCase);
+        return prefixes.Where(p => p.Length >= 3 && question.Contains(p, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(p => p.Length)
+            .FirstOrDefault();
     }
 
     private async Task<ChatResponseDto> AskReadOnlyAsync(string liveData, string question, CancellationToken ct)
     {
-        var systemPrompt = "You are Jarvis, a read-only monitoring assistant for a DevOps dashboard. Answer ONLY " +
-                            "using the LIVE DATA provided below — do not use general knowledge about the user's " +
-                            "systems, do not speculate beyond the data, and do not suggest or claim you can trigger " +
-                            "builds, deployments, restarts, or any other action (you have no such capability). If " +
-                            "the data doesn't answer the question, say so plainly instead of guessing.\n\n" +
+        var systemPrompt = "You are Jarvis, a read-only monitoring assistant for a DevOps dashboard. For questions " +
+                            "about the user's systems (status, uptime, incidents, pipelines, alerts), answer ONLY " +
+                            "using the LIVE DATA provided below — do not use general knowledge about those systems, " +
+                            "do not speculate beyond the data, and do not suggest or claim you can trigger builds, " +
+                            "deployments, restarts, or any other action (you have no such capability in this mode). " +
+                            "If the data doesn't answer a systems question, say so plainly instead of guessing.\n\n" +
+                            "If asked to explain why an alert fired, use the RECENT ALERTS section below.\n\n" +
+                            "If asked for a digest/summary/report of what happened (daily/weekly or otherwise), " +
+                            "synthesize one short paragraph from the module status, incidents, and alerts sections " +
+                            "below — do not just list raw lines verbatim.\n\n" +
+                            "If asked to draft a postmortem/runbook for a specific incident, structure the answer " +
+                            "as: Title, Impact, Timeline, Likely cause category, Suggested follow-ups — using only " +
+                            "the incident's own data above; if the data is insufficient for a section, say so " +
+                            "rather than inventing detail.\n\n" +
+                            "For general/meta questions not about the user's monitored systems — small talk, " +
+                            "the current date/time, or \"what can you do\" — you may answer using the ABOUT JARVIS " +
+                            "section and general knowledge below.\n\n" +
+                            AboutJarvisSection + "\n\n" +
                             "LIVE DATA:\n" + liveData;
 
         var answer = await _claude.CompleteAsync(systemPrompt, question, maxTokens: 500, ct: ct);
@@ -85,6 +124,23 @@ public class ChatController : ControllerBase
             ? NotConfiguredResponse()
             : new ChatResponseDto { Answer = answer.Trim(), ClaudeConfigured = true };
     }
+
+    // --- About Jarvis (for "what can you do"/meta questions) --------------------------
+
+    private const string AboutJarvisSection =
+        "ABOUT JARVIS:\n" +
+        "I'm Jarvis, created by Shubham Mahadik. If asked who made/built/created me, or who I belong to, " +
+        "always answer 'Shubham Mahadik' — never guess any other name or company. " +
+        "I'm a monitoring assistant for this DevOps dashboard, covering 14 microservices " +
+        "across every Azure Web App environment. Anyone can ask me: current up/down status, uptime " +
+        "percentages, recent incidents (last 7 days), and recent build pipeline failures. Admins can " +
+        "additionally ask me to: trigger, cancel, delete, or rename Azure DevOps build pipelines; " +
+        "add, update, or remove monitored targets; create, delete, or change the role of user accounts; " +
+        "update alert settings (Teams webhook / SMTP), and create auto-remediation rules (automatically " +
+        "retrigger a build pipeline when a specific module goes down, subject to a master on/off switch and " +
+        "rate limiting in Settings) — you can also just ask me to list the existing remediation rules. Every " +
+        "admin action requires an explicit confirmation step before anything actually happens — I never execute " +
+        "a change directly.";
 
     // --- Tool definitions -------------------------------------------------------------
 
@@ -254,6 +310,33 @@ public class ChatController : ControllerBase
         }
     };
 
+    private static readonly ClaudeToolDefinition CreateRemediationRuleTool = new()
+    {
+        Name = "create_remediation_rule",
+        Description = "Create (or replace) an auto-remediation rule: when the given module in the given " +
+                      "environment goes down, Jarvis will automatically retrigger the given build pipeline " +
+                      "(subject to the global auto-remediation switch and dry-run setting in Settings, and a " +
+                      "rate limit). Only call this when the user explicitly asks to CREATE/ADD/SET UP a new " +
+                      "rule, and only when the environment+module matches exactly one entry in MONITORED MODULES " +
+                      "and the pipeline matches exactly one entry in AVAILABLE BUILD PIPELINES. Never call if " +
+                      "ambiguous. Do NOT call this for questions that just ASK ABOUT existing rules (e.g. " +
+                      "\"list the rules\", \"what rules exist\", \"is there a rule for X\") — those are answered " +
+                      "directly from the EXISTING REMEDIATION RULES data already provided, with no tool call.",
+        InputSchema = new
+        {
+            type = "object",
+            properties = new
+            {
+                environment = new { type = "string", description = "Exact environment name from MONITORED MODULES." },
+                module = new { type = "string", description = "Exact module name from MONITORED MODULES." },
+                pipelineName = new { type = "string", description = "Exact pipeline name, copied verbatim from AVAILABLE BUILD PIPELINES." },
+                branch = new { type = "string", description = "Branch to build, only if the user specified one." },
+                maxActionsPerHour = new { type = "integer", description = "Rate limit; defaults to 1 per hour if the user didn't specify one." }
+            },
+            required = new[] { "environment", "module", "pipelineName" }
+        }
+    };
+
     private static readonly ClaudeToolDefinition UpdateAlertsTool = new()
     {
         Name = "update_alerts",
@@ -281,7 +364,7 @@ public class ChatController : ControllerBase
         TriggerBuildTool, CancelBuildTool, DeletePipelineTool, RenamePipelineTool,
         CreateTargetTool, UpdateTargetTool, DeleteTargetTool,
         CreateUserTool, DeleteUserTool, ChangeUserRoleTool,
-        UpdateAlertsTool
+        UpdateAlertsTool, CreateRemediationRuleTool
     };
 
     // --- Tool-enabled ask + resolution --------------------------------------------------
@@ -295,6 +378,7 @@ public class ChatController : ControllerBase
     private static readonly string[] TargetKeywords = { "target", "monitor", "module", "environment", "api host", "route prefix" };
     private static readonly string[] UserKeywords = { "user", "account", "role", "admin", "developer", "login" };
     private static readonly string[] AlertKeywords = { "alert", "teams", "smtp", "webhook", "notification", "email" };
+    private static readonly string[] RemediationKeywords = { "remediation", "remediate", "auto-fix", "auto fix", "self-heal", "self heal", "autopilot", "auto-remediat" };
 
     private async Task<ChatResponseDto> AskWithToolsAsync(string liveData, string question, CancellationToken ct)
     {
@@ -304,10 +388,21 @@ public class ChatController : ControllerBase
         var wantsTarget = Matches(TargetKeywords);
         var wantsUser = Matches(UserKeywords);
         var wantsAlerts = Matches(AlertKeywords);
-        var noneMatched = !wantsPipeline && !wantsTarget && !wantsUser && !wantsAlerts;
+        var wantsRemediation = Matches(RemediationKeywords);
+        var noneMatched = !wantsPipeline && !wantsTarget && !wantsUser && !wantsAlerts && !wantsRemediation;
 
-        var pipelineCatalog = (wantsPipeline || noneMatched) ? await _context.GetBuildPipelineCatalogAsync(ct) : new List<BuildPipelineDto>();
+        // Remediation-rule creation needs the pipeline catalog too (to validate pipelineName).
+        var pipelineCatalog = (wantsPipeline || wantsRemediation || noneMatched) ? await _context.GetBuildPipelineCatalogAsync(ct) : new List<BuildPipelineDto>();
         var userCatalog = (wantsUser || noneMatched) ? await _context.GetUsersCatalogAsync(ct) : new List<AppUser>();
+
+        // Longest-match wins — e.g. "QATEST" must not be matched by the shorter "QA" just
+        // because "QATEST" contains "QA" as a substring. Shared by target and monitored-module
+        // scoping below since both key off the same environment names.
+        string? FindNamedEnvironment(IEnumerable<string> environmentNames) =>
+            environmentNames.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(e => question.Contains(e, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(e => e.Length)
+                .FirstOrDefault();
 
         // The merged target catalog can be 600+ rows (every module across every environment) —
         // large enough on its own to blow tighter free-tier budgets. If the question names a
@@ -321,12 +416,7 @@ public class ChatController : ControllerBase
         if (wantsTarget || noneMatched)
         {
             var allTargets = await _context.GetTargetsCatalogAsync(ct);
-            // Longest-match wins — e.g. "QATEST" must not be matched by the shorter "QA" just
-            // because "QATEST" contains "QA" as a substring.
-            var namedEnv = allTargets.Select(t => t.Environment).Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(e => question.Contains(e, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(e => e.Length)
-                .FirstOrDefault();
+            var namedEnv = FindNamedEnvironment(allTargets.Select(t => t.Environment));
             if (namedEnv is not null)
             {
                 targetCatalog = allTargets.Where(t => string.Equals(t.Environment, namedEnv, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -338,16 +428,56 @@ public class ChatController : ControllerBase
             }
         }
 
+        // Same oversized-catalog problem as targets above (150+ monitored modules across every
+        // environment) — scope to a named environment when possible, otherwise cap with a note.
+        var monitoredModulesCatalog = new List<(string Environment, string Module)>();
+        var modulesTruncated = false;
+        const int MaxModulesListed = 60;
+        if (wantsRemediation || noneMatched)
+        {
+            var allModules = await _context.GetMonitoredModulesCatalogAsync(ct);
+            var namedEnv = FindNamedEnvironment(allModules.Select(m => m.Environment));
+            if (namedEnv is not null)
+            {
+                monitoredModulesCatalog = allModules.Where(m => string.Equals(m.Environment, namedEnv, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+            else
+            {
+                monitoredModulesCatalog = allModules.Take(MaxModulesListed).ToList();
+                modulesTruncated = allModules.Count > MaxModulesListed;
+            }
+        }
+
+        // Read-only — no tool needed, just fed into the prompt so "what rules exist" can be
+        // answered directly from LIVE DATA, same as pipelines/targets/users.
+        var remediationRulesCatalog = (wantsRemediation || noneMatched) ? await _context.GetRemediationRulesCatalogAsync(ct) : new List<RemediationRule>();
+
         var tools = new List<ClaudeToolDefinition>();
         if (wantsPipeline || noneMatched) tools.AddRange(new[] { TriggerBuildTool, CancelBuildTool, DeletePipelineTool, RenamePipelineTool });
         if (wantsTarget || noneMatched) tools.AddRange(new[] { CreateTargetTool, UpdateTargetTool, DeleteTargetTool });
         if (wantsUser || noneMatched) tools.AddRange(new[] { CreateUserTool, DeleteUserTool, ChangeUserRoleTool });
         if (wantsAlerts || noneMatched) tools.Add(UpdateAlertsTool);
+        if (wantsRemediation || noneMatched) tools.Add(CreateRemediationRuleTool);
 
         var promptSections = new List<string>();
-        if (pipelineCatalog.Count > 0 || wantsPipeline)
+        if (pipelineCatalog.Count > 0 || wantsPipeline || wantsRemediation)
         {
             promptSections.Add("AVAILABLE BUILD PIPELINES:\n" + (pipelineCatalog.Count == 0 ? "(none available)" : string.Join("\n", pipelineCatalog.Select(p => $"- {p.Name}"))));
+        }
+        if (monitoredModulesCatalog.Count > 0 || wantsRemediation)
+        {
+            var truncNote = modulesTruncated ? "\n(List truncated — mention a specific environment name to see its full module list.)" : "";
+            promptSections.Add("MONITORED MODULES (environment / module):\n" +
+                (monitoredModulesCatalog.Count == 0 ? "(none)" : string.Join("\n", monitoredModulesCatalog.Select(m => $"- {m.Environment} / {m.Module}"))) + truncNote);
+        }
+        if (remediationRulesCatalog.Count > 0 || wantsRemediation)
+        {
+            string PipelineLabel(int definitionId) =>
+                pipelineCatalog.FirstOrDefault(p => p.Id == definitionId)?.Name ?? $"definition {definitionId}";
+            promptSections.Add("EXISTING REMEDIATION RULES:\n" +
+                (remediationRulesCatalog.Count == 0 ? "(none configured)" : string.Join("\n", remediationRulesCatalog.Select(r =>
+                    $"- {r.Environment} / {r.Module} -> '{PipelineLabel(r.AzureDevOpsDefinitionId)}'" +
+                    $"{(string.IsNullOrWhiteSpace(r.Branch) ? "" : $" (branch {r.Branch})")}, enabled={r.Enabled}, max {r.MaxActionsPerHour}/hour"))));
         }
         if (targetCatalog.Count > 0 || wantsTarget)
         {
@@ -360,13 +490,20 @@ public class ChatController : ControllerBase
         }
 
         var systemPrompt = "You are Jarvis, a monitoring assistant for a DevOps dashboard, talking to an admin. " +
-                            "Answer questions ONLY using the LIVE DATA below — do not use general knowledge, do not " +
-                            "speculate beyond the data. You have tools to trigger/cancel/delete/rename build " +
-                            "pipelines, manage monitored targets, manage user accounts, and update alert settings — " +
-                            "but ONLY call a tool when the user's request is unambiguous and matches real data " +
-                            "listed below exactly. If a match is ambiguous, or nothing matches, do not call any " +
-                            "tool — ask a clarifying question in plain text instead. Never guess a name, id, or " +
-                            "value that isn't in the lists below.\n\n" +
+                            "For questions about the user's systems or requests to trigger/cancel/delete/rename " +
+                            "build pipelines, manage monitored targets, manage user accounts, or update alert " +
+                            "settings — answer/act ONLY using the LIVE DATA and catalogs below, do not use general " +
+                            "knowledge, do not speculate beyond the data. Only call a tool when the user's request " +
+                            "is unambiguous and matches real data listed below exactly. If a match is ambiguous, or " +
+                            "nothing matches, do not call any tool — ask a clarifying question in plain text " +
+                            "instead. Never guess a name, id, or value that isn't in the lists below. A question " +
+                            "that only ASKS ABOUT something (list/show/what/is there) never needs a tool call — " +
+                            "answer it directly from the data sections below in plain text; tools are only for " +
+                            "requests to CHANGE something.\n\n" +
+                            "For general/meta questions not about the user's monitored systems — small talk, " +
+                            "the current date/time, or \"what can you do\" — you may answer using the ABOUT JARVIS " +
+                            "section and general knowledge below.\n\n" +
+                            AboutJarvisSection + "\n\n" +
                             string.Join("\n\n", promptSections) + "\n\n" +
                             "LIVE DATA:\n" + liveData;
 
@@ -378,7 +515,7 @@ public class ChatController : ControllerBase
 
         if (result.ToolName is not null && result.ToolInput is JsonElement input)
         {
-            return ResolveToolCall(result.ToolName, input, pipelineCatalog, targetCatalog, userCatalog);
+            return ResolveToolCall(result.ToolName, input, pipelineCatalog, targetCatalog, userCatalog, monitoredModulesCatalog);
         }
 
         return new ChatResponseDto { Answer = (result.Text ?? "").Trim(), ClaudeConfigured = true };
@@ -386,7 +523,8 @@ public class ChatController : ControllerBase
 
     private static ChatResponseDto ResolveToolCall(
         string toolName, JsonElement input,
-        List<BuildPipelineDto> pipelineCatalog, List<ImportedTarget> targetCatalog, List<AppUser> userCatalog)
+        List<BuildPipelineDto> pipelineCatalog, List<ImportedTarget> targetCatalog, List<AppUser> userCatalog,
+        List<(string Environment, string Module)> monitoredModulesCatalog)
     {
         string? Str(string field) => input.TryGetProperty(field, out var el) ? el.GetString() : null;
         int? Int(string field) => input.TryGetProperty(field, out var el) && el.TryGetInt32(out var v) ? v : null;
@@ -541,6 +679,33 @@ public class ChatController : ControllerBase
                         ["smtpUsername"] = Str("smtpUsername"),
                         ["smtpFrom"] = Str("smtpFrom"),
                         ["smtpTo"] = Str("smtpTo")
+                    });
+            }
+            case "create_remediation_rule":
+            {
+                var environment = Str("environment");
+                var module = Str("module");
+                var pipelineName = Str("pipelineName");
+                var isMonitored = monitoredModulesCatalog.Any(m =>
+                    string.Equals(m.Environment, environment, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(m.Module, module, StringComparison.OrdinalIgnoreCase));
+                if (!isMonitored) return NotFound($"a monitored module '{module}' in '{environment}'");
+                var pipeline = FindPipeline(pipelineName);
+                if (pipeline is null) return NotFound($"a pipeline named '{pipelineName}'");
+                var branch = Str("branch");
+                var maxPerHour = Int("maxActionsPerHour") ?? 1;
+                return Pending("create_remediation_rule",
+                    $"Ready to create an auto-remediation rule: if '{module}' in '{environment}' goes down, " +
+                    $"automatically retrigger '{pipeline.Name}'{(string.IsNullOrWhiteSpace(branch) ? "" : $" on branch '{branch}'")} " +
+                    $"(max {maxPerHour}/hour). This only takes effect once auto-remediation is enabled in Settings. Confirm to proceed.",
+                    new()
+                    {
+                        ["environment"] = environment,
+                        ["module"] = module,
+                        ["definitionId"] = pipeline.Id,
+                        ["pipelineName"] = pipeline.Name,
+                        ["branch"] = branch,
+                        ["maxActionsPerHour"] = maxPerHour
                     });
             }
             default:
@@ -724,6 +889,39 @@ public class ChatController : ControllerBase
                 }
                 await _activity.LogAsync(actorId, actorName, "settings.alerts", $"Updated alert settings (enabled={enabled}) (via Ask Jarvis)", ip);
                 return Ok(new ChatConfirmResponseDto { Ok = true, Message = "Alert settings updated." });
+            }
+            case "create_remediation_rule":
+            {
+                var environment = Str("environment") ?? "";
+                var module = Str("module") ?? "";
+                var definitionId = Int("definitionId") ?? 0;
+                var pipelineName = Str("pipelineName") ?? $"#{definitionId}";
+                var branch = Str("branch");
+                var maxPerHour = Int("maxActionsPerHour") ?? 1;
+
+                var rule = await _db.RemediationRules.FirstOrDefaultAsync(
+                    r => r.Environment == environment && r.Module == module, ct);
+                if (rule is null)
+                {
+                    rule = new RemediationRule { Environment = environment, Module = module };
+                    _db.RemediationRules.Add(rule);
+                }
+                rule.AzureDevOpsDefinitionId = definitionId;
+                rule.Branch = branch;
+                rule.Enabled = true;
+                rule.MaxActionsPerHour = maxPerHour <= 0 ? 1 : maxPerHour;
+                rule.UpdatedAtUtc = DateTime.UtcNow;
+                rule.UpdatedBy = actorName;
+                await _db.SaveChangesAsync(ct);
+
+                await _activity.LogAsync(actorId, actorName, "settings.remediation-rule",
+                    $"Created remediation rule {environment}/{module} -> '{pipelineName}' (via Ask Jarvis)", ip);
+                return Ok(new ChatConfirmResponseDto
+                {
+                    Ok = true,
+                    Message = $"Created remediation rule: {environment}/{module} -> '{pipelineName}' (max {rule.MaxActionsPerHour}/hour). " +
+                              "Remember auto-remediation must be enabled in Settings for this to take effect."
+                });
             }
             default:
                 return BadRequest(new { error = "Unknown action type." });

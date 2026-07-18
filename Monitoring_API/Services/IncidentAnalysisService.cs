@@ -17,7 +17,20 @@ public class IncidentAnalysisService
 
     // Anomalous if the latest response time exceeds this many standard
     // deviations above the module's own recent baseline.
+    // A parallel z-score baseline for failure RATE (rather than latency) was
+    // considered and rejected: failure rate for a healthy service is near-zero
+    // and bursty/Bernoulli-shaped, a poor fit for a mean/stddev model — it would
+    // either never fire (near-zero stddev blows up the z-score) or fire on the
+    // very first real failure, which the debounced incident detection below and
+    // the flaky-flip-count heuristic already cover between them. Not worth the
+    // added false-positive surface.
     private const double AnomalyZScoreThreshold = 3.0;
+
+    // A failing run must reach this many consecutive samples before it's counted
+    // as an incident — filters a single transient blip (e.g. one dropped health
+    // check) from opening/alerting on a real outage. At the default 60s poll
+    // interval this is ~2 minutes of continuous failure.
+    private const int MinConsecutiveFailuresToOpenIncident = 2;
 
     // A period-over-period uptime drop of at least this many points is
     // reported as a "degrading" trend rather than noise.
@@ -26,7 +39,8 @@ public class IncidentAnalysisService
     // Groups consecutive IsUp=false runs into incidents. `checks` must
     // already be filtered to one (module, checkType) pair and ordered by
     // TimestampUtc ascending.
-    public List<IncidentDto> ComputeIncidents(string module, CheckType checkType, IReadOnlyList<StatusCheck> checks)
+    public List<IncidentDto> ComputeIncidents(string module, CheckType checkType, IReadOnlyList<StatusCheck> checks,
+        int minConsecutiveFailures = MinConsecutiveFailuresToOpenIncident)
     {
         var incidents = new List<IncidentDto>();
         if (checks.Count == 0) return incidents;
@@ -38,6 +52,14 @@ public class IncidentAnalysisService
         void CloseRun(DateTime? resolvedAt)
         {
             if (runStart is null) return;
+            if (runCount < minConsecutiveFailures)
+            {
+                // Sub-threshold blip — discard entirely rather than recording a short incident.
+                runStart = null;
+                runLast = null;
+                runCount = 0;
+                return;
+            }
             var duration = ((resolvedAt ?? runLast!.TimestampUtc) - runStart.TimestampUtc).TotalMinutes;
             var incident = new IncidentDto
             {
@@ -102,7 +124,13 @@ public class IncidentAnalysisService
             systemPrompt: "You are an SRE assistant writing on-call incident summaries for a monitoring dashboard. " +
                           "Given structured incident data, write ONE concise plain-English sentence describing the " +
                           "likely cause and impact. Do not invent facts not present in the data — if the error " +
-                          "message is generic or missing, say so rather than guessing a specific cause. No preamble.",
+                          "message is generic or missing, say so rather than guessing a specific cause. Then, on a " +
+                          "new line, add exactly one tag in the form 'Likely category: X' where X is one of " +
+                          "network, deploy, dependency, database, timeout, unknown — chosen purely from the error " +
+                          "message/status code pattern (e.g. DNS/connection errors -> network, 5xx after a known " +
+                          "deploy window -> deploy, timeout errors -> timeout); use 'unknown' rather than guess " +
+                          "when the data doesn't clearly indicate a category. This is a suggestion, not a diagnosis. " +
+                          "No other preamble.",
             userPrompt: context,
             maxTokens: 200,
             ct: ct);

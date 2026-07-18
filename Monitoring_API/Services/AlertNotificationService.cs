@@ -18,6 +18,11 @@ public class AlertNotificationService
     // rather than firing exactly once and going silent for the rest of the outage.
     private static readonly TimeSpan ReminderCooldown = TimeSpan.FromHours(4);
 
+    // Auto-remediation: don't re-trigger a build for the same ongoing condition more often
+    // than this, even if under the per-rule hourly cap — catches "just triggered 5 min ago,
+    // still failing" distinctly from a pure per-hour counter.
+    private static readonly TimeSpan RemediationCooldown = TimeSpan.FromMinutes(15);
+
     private readonly MonitoringDbContext _db;
     private readonly ITargetProvider _targetProvider;
     private readonly IncidentAnalysisService _incidentAnalysis;
@@ -25,6 +30,7 @@ public class AlertNotificationService
     private readonly AzureDevOpsService _azure;
     private readonly IClaudeService _claude;
     private readonly SettingsService _settings;
+    private readonly ActivityLogger _activity;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AlertNotificationService> _logger;
 
@@ -36,6 +42,7 @@ public class AlertNotificationService
         AzureDevOpsService azure,
         IClaudeService claude,
         SettingsService settings,
+        ActivityLogger activity,
         IHttpClientFactory httpClientFactory,
         ILogger<AlertNotificationService> logger)
     {
@@ -46,6 +53,7 @@ public class AlertNotificationService
         _azure = azure;
         _claude = claude;
         _settings = settings;
+        _activity = activity;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -53,17 +61,74 @@ public class AlertNotificationService
     public async Task EvaluateAndNotifyAsync(CancellationToken ct)
     {
         var enabled = string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AlertsEnabled, ct), "true", StringComparison.OrdinalIgnoreCase);
-        if (!enabled)
+        if (enabled)
         {
-            return;
+            var results = await EvaluateModulesAsync(ct);
+            await EvaluateRemediationAsync(results, ct);
+            await EvaluatePipelinesAsync(ct);
         }
-
-        await EvaluateModulesAsync(ct);
-        await EvaluatePipelinesAsync(ct);
+        else
+        {
+            // Alerts off doesn't necessarily mean remediation should be skipped — remediation
+            // has its own master switch — but it needs the same incident/insight computation,
+            // so recompute it here if remediation alone is enabled.
+            var remediationEnabled = string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AutoRemediationEnabled, ct), "true", StringComparison.OrdinalIgnoreCase);
+            if (remediationEnabled)
+            {
+                var results = await ComputeModuleResultsAsync(ct);
+                await EvaluateRemediationAsync(results, ct);
+            }
+        }
     }
 
-    private async Task EvaluateModulesAsync(CancellationToken ct)
+    private async Task<List<ModuleEvalResult>> EvaluateModulesAsync(CancellationToken ct)
     {
+        var results = await ComputeModuleResultsAsync(ct);
+
+        foreach (var r in results)
+        {
+            if (r.OpenIncident is not null)
+            {
+                var summary = await _incidentAnalysis.SummarizeAsync(r.OpenIncident, _claude, ct);
+                await FireIfNeededAsync(r.Environment, r.Module, "incident", summary, ct);
+            }
+            else
+            {
+                await ResolveIfOpenAsync(r.Environment, r.Module, "incident", ct);
+            }
+
+            if (r.Insight.IsFlaky)
+            {
+                await FireIfNeededAsync(r.Environment, r.Module, "flaky",
+                    $"{r.Module} in {r.Environment} is flaky — {r.Insight.FlipsLastHour} state changes in the last hour.", ct);
+            }
+            else
+            {
+                await ResolveIfOpenAsync(r.Environment, r.Module, "flaky", ct);
+            }
+
+            if (r.Insight.IsResponseTimeAnomalous)
+            {
+                await FireIfNeededAsync(r.Environment, r.Module, "anomaly",
+                    $"{r.Module} in {r.Environment} response time is anomalous — {r.Insight.LatestResponseTimeMs}ms vs baseline {r.Insight.BaselineResponseTimeMs}ms.", ct);
+            }
+            else
+            {
+                await ResolveIfOpenAsync(r.Environment, r.Module, "anomaly", ct);
+            }
+        }
+
+        return results;
+    }
+
+    private sealed record ModuleEvalResult(string Environment, string Module, IncidentDto? OpenIncident, ModuleInsightDto Insight);
+
+    // Loads checks and computes incidents/insight per module once per cycle — shared by both
+    // the alert-firing loop above and the auto-remediation evaluation below, so the two never
+    // recompute (and potentially disagree about) "is this module currently down".
+    private async Task<List<ModuleEvalResult>> ComputeModuleResultsAsync(CancellationToken ct)
+    {
+        var results = new List<ModuleEvalResult>();
         var environments = await _targetProvider.GetEnvironmentsAsync(ct);
         var since = DateTime.UtcNow.AddDays(-7);
 
@@ -88,38 +153,12 @@ public class AlertNotificationService
                     .SelectMany(g => _incidentAnalysis.ComputeIncidents(target.Module, g.Key, g.ToList()))
                     .FirstOrDefault(i => i.ResolvedAtUtc is null);
 
-                if (openIncident is not null)
-                {
-                    var summary = await _incidentAnalysis.SummarizeAsync(openIncident, _claude, ct);
-                    await FireIfNeededAsync(env.Name, target.Module, "incident", summary, ct);
-                }
-                else
-                {
-                    await ResolveIfOpenAsync(env.Name, target.Module, "incident", ct);
-                }
-
                 var insight = _incidentAnalysis.ComputeInsight(target.Module, moduleChecks);
-                if (insight.IsFlaky)
-                {
-                    await FireIfNeededAsync(env.Name, target.Module, "flaky",
-                        $"{target.Module} in {env.Name} is flaky — {insight.FlipsLastHour} state changes in the last hour.", ct);
-                }
-                else
-                {
-                    await ResolveIfOpenAsync(env.Name, target.Module, "flaky", ct);
-                }
-
-                if (insight.IsResponseTimeAnomalous)
-                {
-                    await FireIfNeededAsync(env.Name, target.Module, "anomaly",
-                        $"{target.Module} in {env.Name} response time is anomalous — {insight.LatestResponseTimeMs}ms vs baseline {insight.BaselineResponseTimeMs}ms.", ct);
-                }
-                else
-                {
-                    await ResolveIfOpenAsync(env.Name, target.Module, "anomaly", ct);
-                }
+                results.Add(new ModuleEvalResult(env.Name, target.Module, openIncident, insight));
             }
         }
+
+        return results;
     }
 
     private async Task EvaluatePipelinesAsync(CancellationToken ct)
@@ -135,7 +174,26 @@ public class AlertNotificationService
             if (PipelineAnalysisService.ShouldAlert(insight.ConsecutiveFailures))
             {
                 var errors = def.LatestBuildId is int bid ? await _azure.GetBuildErrorsAsync(bid, ct) : new List<BuildErrorRecordDto>();
-                var summary = await _pipelineAnalysis.SummarizeBuildAsync(insight, errors, _claude, ct);
+
+                // Up to 2 other recent failed builds (excluding the current one) for "does this
+                // look like a repeat of a past failure" comparison — cheap since history is
+                // already fetched above, just reusing build IDs already in hand.
+                var otherFailedBuildIds = history
+                    .Where(b => b.Result is "failed" or "partiallySucceeded" && b.Id != def.LatestBuildId)
+                    .OrderByDescending(b => b.FinishTime)
+                    .Take(2)
+                    .Select(b => b.Id)
+                    .ToList();
+                var pastFailureSnippets = new List<string>();
+                foreach (var pastBuildId in otherFailedBuildIds)
+                {
+                    var pastErrors = await _azure.GetBuildErrorsAsync(pastBuildId, ct);
+                    var msg = pastErrors.SelectMany(e => e.Issues.Select(i => i.Message))
+                        .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+                    if (msg is not null) pastFailureSnippets.Add(msg);
+                }
+
+                var summary = await _pipelineAnalysis.SummarizeBuildAsync(insight, errors, pastFailureSnippets, _claude, ct);
                 await FireIfNeededAsync("Pipelines", def.Name, "build_failure", summary, ct);
             }
             else
@@ -193,6 +251,99 @@ public class AlertNotificationService
             open.ResolvedAtUtc = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
         }
+    }
+
+    // Auto-remediation: for each module still down, look up an explicit RemediationRule and —
+    // if enabled, under the rate limit, and past cooldown — retrigger its build pipeline.
+    // Off by default (AutoRemediation:Enabled), and defaults to dry-run (logs the decision
+    // without calling Azure DevOps) even when enabled, so it can be observed safely first.
+    private async Task EvaluateRemediationAsync(List<ModuleEvalResult> results, CancellationToken ct)
+    {
+        var enabled = string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AutoRemediationEnabled, ct), "true", StringComparison.OrdinalIgnoreCase);
+        if (!enabled)
+        {
+            return;
+        }
+
+        var dryRun = !string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AutoRemediationDryRun, ct), "false", StringComparison.OrdinalIgnoreCase);
+
+        foreach (var r in results)
+        {
+            var dedupKey = $"{r.Environment}:{r.Module}:remediation";
+
+            if (r.OpenIncident is null)
+            {
+                // Recovered — close any open remediation row so a future recurrence starts fresh.
+                var openRow = await _db.RemediationHistories.FirstOrDefaultAsync(h => h.DedupKey == dedupKey && h.ResolvedAtUtc == null, ct);
+                if (openRow is not null)
+                {
+                    openRow.ResolvedAtUtc = DateTime.UtcNow;
+                    await _db.SaveChangesAsync(ct);
+                }
+                continue;
+            }
+
+            var rule = await _db.RemediationRules.FirstOrDefaultAsync(
+                x => x.Environment == r.Environment && x.Module == r.Module && x.Enabled, ct);
+            if (rule is null)
+            {
+                // No explicit mapping (or explicitly disabled) — never fuzzy-matched, just skip.
+                continue;
+            }
+
+            var now = DateTime.UtcNow;
+            var hourAgo = now.AddHours(-1);
+            var actionsThisHour = await _db.RemediationHistories.CountAsync(
+                h => h.DedupKey == dedupKey && h.FiredAtUtc >= hourAgo && (h.Action == "triggered" || h.Action == "would_trigger"), ct);
+
+            if (actionsThisHour >= rule.MaxActionsPerHour)
+            {
+                await LogRemediationAsync(r, rule, dedupKey, "skipped_rate_limit", ok: false, buildId: null, error: null, ct);
+                continue;
+            }
+
+            var recentlyFired = await _db.RemediationHistories.AnyAsync(
+                h => h.DedupKey == dedupKey && h.FiredAtUtc >= now.Subtract(RemediationCooldown)
+                     && (h.Action == "triggered" || h.Action == "would_trigger"), ct);
+            if (recentlyFired)
+            {
+                await LogRemediationAsync(r, rule, dedupKey, "skipped_cooldown", ok: false, buildId: null, error: null, ct);
+                continue;
+            }
+
+            if (dryRun)
+            {
+                _logger.LogInformation("[DRY RUN] would trigger build {DefinitionId} for {Environment}/{Module}",
+                    rule.AzureDevOpsDefinitionId, r.Environment, r.Module);
+                await LogRemediationAsync(r, rule, dedupKey, "would_trigger", ok: true, buildId: null, error: null, ct);
+                await _activity.LogAsync(null, "auto-remediation", "remediation.dry_run",
+                    $"env={r.Environment} module={r.Module} definitionId={rule.AzureDevOpsDefinitionId} (dry run — no build queued)", null);
+                continue;
+            }
+
+            var result = await _azure.QueueBuildAsync(rule.AzureDevOpsDefinitionId, rule.Branch, ct);
+            await LogRemediationAsync(r, rule, dedupKey, "triggered", result.Ok, result.BuildId, result.Error, ct);
+            await _activity.LogAsync(null, "auto-remediation", "remediation.trigger",
+                $"env={r.Environment} module={r.Module} definitionId={rule.AzureDevOpsDefinitionId} buildId={result.BuildId} ok={result.Ok}" +
+                (result.Ok ? "" : $" error={result.Error}"), null);
+        }
+    }
+
+    private async Task LogRemediationAsync(ModuleEvalResult r, RemediationRule rule, string dedupKey, string action, bool ok, int? buildId, string? error, CancellationToken ct)
+    {
+        _db.RemediationHistories.Add(new RemediationHistory
+        {
+            Environment = r.Environment,
+            Module = r.Module,
+            DedupKey = dedupKey,
+            RuleId = rule.Id,
+            Action = action,
+            Ok = ok,
+            BuildId = buildId,
+            Error = error,
+            FiredAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task SendAsync(AlertHistory alert, CancellationToken ct)

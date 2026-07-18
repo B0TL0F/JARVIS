@@ -126,12 +126,26 @@ public class PipelineAnalysisService
     // call fails/times out.
     public async Task<string> SummarizeBuildAsync(BuildInsightDto insight, IReadOnlyList<BuildErrorRecordDto> errors, IClaudeService claude, CancellationToken ct = default)
     {
+        return await SummarizeBuildAsync(insight, errors, Array.Empty<string>(), claude, ct);
+    }
+
+    // pastFailureErrorSnippets: error text from this pipeline's OTHER recent failed builds (not the
+    // current one), oldest-agnostic — lets the model note "this looks like the same issue as before"
+    // instead of treating every failure as novel. Caller decides how many/which to include; this
+    // method makes no history query of its own (keeps this class's no-DB-dependency shape intact).
+    public async Task<string> SummarizeBuildAsync(BuildInsightDto insight, IReadOnlyList<BuildErrorRecordDto> errors,
+        IReadOnlyList<string> pastFailureErrorSnippets, IClaudeService claude, CancellationToken ct = default)
+    {
         var template = BuildTemplateSummary(insight);
 
         var errorLines = errors.Count == 0
             ? "none captured"
             : string.Join("; ", errors.SelectMany(e => e.Issues.Select(i => i.Message))
                 .Where(m => !string.IsNullOrWhiteSpace(m)).Take(5));
+
+        var pastFailuresLine = pastFailureErrorSnippets.Count == 0
+            ? "none available"
+            : string.Join(" | ", pastFailureErrorSnippets.Take(3));
 
         var context = $"""
             Pipeline: {insight.Name}
@@ -142,15 +156,19 @@ public class PipelineAnalysisService
             Trend: {insight.Trend}
             Duration anomaly: {insight.IsDurationAnomalous} (latest {insight.LatestDurationMinutes} min vs baseline {insight.BaselineDurationMinutes} min)
             Recent build error messages: {errorLines}
+            Error messages from this pipeline's other recent failures (for comparison only): {pastFailuresLine}
             """;
 
         var text = await claude.CompleteAsync(
             systemPrompt: "You are a DevOps assistant writing CI/CD pipeline health summaries for a monitoring " +
                           "dashboard. Given structured build-pipeline statistics and any captured error messages, " +
                           "write ONE concise plain-English sentence describing the pipeline's likely health issue " +
-                          "and probable cause. Do not invent facts not present in the data. No preamble.",
+                          "and probable cause. If the current error message closely resembles one of the other " +
+                          "recent failures' messages provided for comparison, add a short second sentence noting " +
+                          "it looks like a repeat of a previous failure — only if the resemblance is clear and " +
+                          "textual, never a guess. Do not invent facts not present in the data. No preamble.",
             userPrompt: context,
-            maxTokens: 200,
+            maxTokens: 220,
             ct: ct);
 
         return string.IsNullOrWhiteSpace(text) ? template : text.Trim();

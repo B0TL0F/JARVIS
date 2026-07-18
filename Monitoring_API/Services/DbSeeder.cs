@@ -42,6 +42,34 @@ public static class DbSeeder
             );
             CREATE INDEX IF NOT EXISTS "IX_AlertHistories_DedupKey" ON "AlertHistories" ("DedupKey");
             CREATE INDEX IF NOT EXISTS "IX_AlertHistories_Environment_LastFiredAtUtc" ON "AlertHistories" ("Environment", "LastFiredAtUtc");
+
+            CREATE TABLE IF NOT EXISTS "RemediationRules" (
+                "Id" SERIAL PRIMARY KEY,
+                "Environment" VARCHAR(50) NOT NULL,
+                "Module" VARCHAR(100) NOT NULL,
+                "AzureDevOpsDefinitionId" INTEGER NOT NULL,
+                "Branch" VARCHAR(255) NULL,
+                "Enabled" BOOLEAN NOT NULL,
+                "MaxActionsPerHour" INTEGER NOT NULL,
+                "UpdatedAtUtc" TIMESTAMP NOT NULL,
+                "UpdatedBy" VARCHAR(100) NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_RemediationRules_Environment_Module" ON "RemediationRules" ("Environment", "Module");
+
+            CREATE TABLE IF NOT EXISTS "RemediationHistories" (
+                "Id" SERIAL PRIMARY KEY,
+                "Environment" VARCHAR(50) NOT NULL,
+                "Module" VARCHAR(100) NOT NULL,
+                "DedupKey" VARCHAR(200) NOT NULL,
+                "RuleId" INTEGER NOT NULL,
+                "Action" VARCHAR(30) NOT NULL,
+                "Ok" BOOLEAN NOT NULL,
+                "BuildId" INTEGER NULL,
+                "Error" VARCHAR(1000) NULL,
+                "FiredAtUtc" TIMESTAMP NOT NULL,
+                "ResolvedAtUtc" TIMESTAMP NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_RemediationHistories_DedupKey_FiredAtUtc" ON "RemediationHistories" ("DedupKey", "FiredAtUtc");
             """, ct);
 
         if (await db.AppUsers.AnyAsync(ct))

@@ -15,6 +15,8 @@ public class MonitoringDbContext : DbContext
     public DbSet<ImportedTarget> ImportedTargets => Set<ImportedTarget>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AlertHistory> AlertHistories => Set<AlertHistory>();
+    public DbSet<RemediationRule> RemediationRules => Set<RemediationRule>();
+    public DbSet<RemediationHistory> RemediationHistories => Set<RemediationHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +80,28 @@ public class MonitoringDbContext : DbContext
             // application logic (AlertNotificationService) enforces "at most one open row per key".
             entity.HasIndex(e => e.DedupKey);
             entity.HasIndex(e => new { e.Environment, e.LastFiredAtUtc });
+        });
+
+        modelBuilder.Entity<RemediationRule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Environment).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Module).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Branch).HasMaxLength(255);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+            // One active rule per (Environment, Module) — explicit config only, never fuzzy-matched.
+            entity.HasIndex(e => new { e.Environment, e.Module }).IsUnique();
+        });
+
+        modelBuilder.Entity<RemediationHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Environment).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Module).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DedupKey).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Action).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Error).HasMaxLength(1000);
+            entity.HasIndex(e => new { e.DedupKey, e.FiredAtUtc });
         });
     }
 }

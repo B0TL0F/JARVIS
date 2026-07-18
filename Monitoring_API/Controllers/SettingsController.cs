@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Monitoring_API.Data;
 using Monitoring_API.Middleware;
 using Monitoring_API.Models;
 using Monitoring_API.Services;
@@ -15,12 +17,14 @@ public class SettingsController : ControllerBase
     private readonly SettingsService _settings;
     private readonly OcelotImportService _ocelot;
     private readonly ActivityLogger _activity;
+    private readonly MonitoringDbContext _db;
 
-    public SettingsController(SettingsService settings, OcelotImportService ocelot, ActivityLogger activity)
+    public SettingsController(SettingsService settings, OcelotImportService ocelot, ActivityLogger activity, MonitoringDbContext db)
     {
         _settings = settings;
         _ocelot = ocelot;
         _activity = activity;
+        _db = db;
     }
 
     private bool RequireAdmin(out ActionResult? forbid)
@@ -81,6 +85,12 @@ public class SettingsController : ControllerBase
                 SmtpFrom = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpFrom, ct),
                 SmtpTo = await _settings.GetEffectiveAsync(SettingKeys.AlertsSmtpTo, ct),
                 SmtpPasswordConfigured = await _settings.HasValueAsync(SettingKeys.AlertsSmtpPassword, ct)
+            },
+            autoRemediation = new AutoRemediationSettingsDto
+            {
+                Enabled = string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AutoRemediationEnabled, ct), "true", StringComparison.OrdinalIgnoreCase),
+                // Defaults to true (fail toward safe) when unset — only an explicit "false" turns dry-run off.
+                DryRun = !string.Equals(await _settings.GetEffectiveAsync(SettingKeys.AutoRemediationDryRun, ct), "false", StringComparison.OrdinalIgnoreCase)
             }
         });
     }
@@ -206,6 +216,108 @@ public class SettingsController : ControllerBase
 
         await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
             "settings.azure", "Updated Azure DevOps settings", BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpPut("auto-remediation")]
+    public async Task<IActionResult> UpdateAutoRemediation([FromBody] AutoRemediationSettingsUpdate req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        await _settings.SetAsync(SettingKeys.AutoRemediationEnabled, req.Enabled ? "true" : "false", ct);
+        await _settings.SetAsync(SettingKeys.AutoRemediationDryRun, req.DryRun ? "true" : "false", ct);
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User),
+            "settings.auto-remediation", $"Updated auto-remediation settings (enabled={req.Enabled}, dryRun={req.DryRun})",
+            BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return NoContent();
+    }
+
+    [HttpGet("remediation-rules")]
+    public async Task<ActionResult<List<RemediationRuleDto>>> GetRemediationRules(CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        var rules = await _db.RemediationRules
+            .OrderBy(r => r.Environment).ThenBy(r => r.Module)
+            .Select(r => new RemediationRuleDto
+            {
+                Id = r.Id,
+                Environment = r.Environment,
+                Module = r.Module,
+                AzureDevOpsDefinitionId = r.AzureDevOpsDefinitionId,
+                Branch = r.Branch,
+                Enabled = r.Enabled,
+                MaxActionsPerHour = r.MaxActionsPerHour,
+                UpdatedAtUtc = r.UpdatedAtUtc,
+                UpdatedBy = r.UpdatedBy
+            })
+            .ToListAsync(ct);
+
+        return Ok(rules);
+    }
+
+    [HttpPut("remediation-rules")]
+    public async Task<ActionResult<RemediationRuleDto>> UpsertRemediationRule([FromBody] RemediationRuleUpsertDto req, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        if (string.IsNullOrWhiteSpace(req.Environment) || string.IsNullOrWhiteSpace(req.Module) || req.AzureDevOpsDefinitionId <= 0)
+        {
+            return BadRequest(new { error = "Environment, module, and a valid Azure DevOps definition ID are required." });
+        }
+
+        var rule = await _db.RemediationRules.FirstOrDefaultAsync(
+            r => r.Environment == req.Environment && r.Module == req.Module, ct);
+
+        if (rule is null)
+        {
+            rule = new RemediationRule { Environment = req.Environment.Trim(), Module = req.Module.Trim() };
+            _db.RemediationRules.Add(rule);
+        }
+
+        rule.AzureDevOpsDefinitionId = req.AzureDevOpsDefinitionId;
+        rule.Branch = string.IsNullOrWhiteSpace(req.Branch) ? null : req.Branch.Trim();
+        rule.Enabled = req.Enabled;
+        rule.MaxActionsPerHour = req.MaxActionsPerHour <= 0 ? 1 : req.MaxActionsPerHour;
+        rule.UpdatedAtUtc = DateTime.UtcNow;
+        rule.UpdatedBy = CurrentUser.Name(User);
+
+        await _db.SaveChangesAsync(ct);
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User), "settings.remediation-rule",
+            $"Upserted remediation rule for {rule.Environment}/{rule.Module} -> definition {rule.AzureDevOpsDefinitionId}",
+            BasicAuthMiddleware.ClientIp(HttpContext));
+
+        return Ok(new RemediationRuleDto
+        {
+            Id = rule.Id,
+            Environment = rule.Environment,
+            Module = rule.Module,
+            AzureDevOpsDefinitionId = rule.AzureDevOpsDefinitionId,
+            Branch = rule.Branch,
+            Enabled = rule.Enabled,
+            MaxActionsPerHour = rule.MaxActionsPerHour,
+            UpdatedAtUtc = rule.UpdatedAtUtc,
+            UpdatedBy = rule.UpdatedBy
+        });
+    }
+
+    [HttpDelete("remediation-rules/{id:int}")]
+    public async Task<IActionResult> DeleteRemediationRule(int id, CancellationToken ct)
+    {
+        if (!RequireAdmin(out var forbid)) return forbid!;
+
+        var rule = await _db.RemediationRules.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (rule is null) return NotFound();
+
+        _db.RemediationRules.Remove(rule);
+        await _db.SaveChangesAsync(ct);
+
+        await _activity.LogAsync(CurrentUser.Id(User), CurrentUser.Name(User), "settings.remediation-rule",
+            $"Deleted remediation rule for {rule.Environment}/{rule.Module}", BasicAuthMiddleware.ClientIp(HttpContext));
 
         return NoContent();
     }

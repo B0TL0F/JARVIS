@@ -39,6 +39,12 @@ interface SpeechRecognitionLike extends EventTarget {
 // reference implementation's stop-word handling (Theme/agentic-os-personal hud.js).
 const STOP_PHRASES = /^\s*(stop|cancel|that'?s all|thank you,?\s*jarvis|thanks,?\s*jarvis)\.?\s*$/i;
 
+// When a pending admin action is awaiting confirmation, these phrases confirm/cancel it BY
+// VOICE instead of requiring a click on the Confirm/Cancel buttons — lets remediation-rule
+// creation and other admin actions be driven end-to-end hands-free.
+const CONFIRM_PHRASES = /^\s*(yes|yeah|yep|confirm|do it|go ahead|proceed)\.?\s*$/i;
+const CANCEL_PHRASES = /^\s*(no|nope|cancel that|don'?t|never mind)\.?\s*$/i;
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -150,7 +156,32 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.historyExpanded = !this.historyExpanded;
   }
 
+  // Latest assistant message still awaiting a Confirm/Cancel click, if any — walking backwards,
+  // hitting a user message first means the most recent exchange had no pending action.
+  private get pendingConfirmationMessage(): ChatMessage | undefined {
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const m = this.messages[i];
+      if (m.role === 'user') return undefined;
+      if (m.pendingAction && !m.actionResolved) return m;
+    }
+    return undefined;
+  }
+
   private onVoiceCommand(transcript: string): void {
+    const pending = this.pendingConfirmationMessage;
+    if (pending) {
+      if (CONFIRM_PHRASES.test(transcript)) {
+        this.confirmActionByVoice(pending);
+        return;
+      }
+      if (CANCEL_PHRASES.test(transcript) || STOP_PHRASES.test(transcript)) {
+        this.cancelActionByVoice(pending);
+        return;
+      }
+      // Anything else while a confirmation is pending is treated as a new question — falls
+      // through below — rather than silently discarding it.
+    }
+
     if (STOP_PHRASES.test(transcript)) {
       this.voiceActivity.stopConversation();
       void this.voice.speak('Okay.');
@@ -158,6 +189,42 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
     this.question = transcript;
     this.askViaVoice();
+  }
+
+  // Voice-aware counterparts of confirmAction()/cancelAction() — same mutation logic, but also
+  // speak the outcome and keep the conversation loop going afterward.
+  private confirmActionByVoice(msg: ChatMessage): void {
+    const action = msg.pendingAction;
+    if (!action || this.triggering) return;
+
+    this.triggering = true;
+    this.chat.confirm(action).subscribe({
+      next: async (res) => {
+        msg.actionResolved = 'confirmed';
+        this.messages.push({ role: 'assistant', text: res.message });
+        this.triggering = false;
+        this.scrollToBottom();
+        await this.voice.speak(res.message);
+        this.voiceActivity.continueConversation();
+      },
+      error: async () => {
+        msg.actionResolved = 'confirmed';
+        const text = 'Something went wrong performing that action.';
+        this.messages.push({ role: 'assistant', text });
+        this.triggering = false;
+        this.scrollToBottom();
+        await this.voice.speak(text);
+        this.voiceActivity.continueConversation();
+      }
+    });
+  }
+
+  private cancelActionByVoice(msg: ChatMessage): void {
+    msg.actionResolved = 'cancelled';
+    const text = 'Okay, not doing that.';
+    this.messages.push({ role: 'assistant', text });
+    this.scrollToBottom();
+    void this.voice.speak(text).then(() => this.voiceActivity.continueConversation());
   }
 
   private setupSpeechRecognition(): void {
