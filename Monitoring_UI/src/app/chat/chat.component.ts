@@ -1,9 +1,11 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ChatService, PendingAction } from '../services/chat.service';
 import { StatusService } from '../services/status.service';
+import { VoiceActivityService } from '../services/voice-activity.service';
+import { VoiceService } from '../services/voice.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -33,6 +35,10 @@ interface SpeechRecognitionLike extends EventTarget {
   onend: (() => void) | null;
 }
 
+// Phrases that end a voice conversation instead of being sent to the assistant — matches the
+// reference implementation's stop-word handling (Theme/agentic-os-personal hud.js).
+const STOP_PHRASES = /^\s*(stop|cancel|that'?s all|thank you,?\s*jarvis|thanks,?\s*jarvis)\.?\s*$/i;
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -41,6 +47,10 @@ interface SpeechRecognitionLike extends EventTarget {
   styleUrl: './chat.component.css'
 })
 export class ChatComponent implements OnInit, OnDestroy {
+  // Embedded = the compact "IDLE / ^ CHAT HISTORY / input" console shown under the Dashboard
+  // globe. Non-embedded = the full-page "Ask Jarvis" nav tab. Both share all chat/voice logic.
+  @Input() embedded = false;
+
   messages: ChatMessage[] = [
     { role: 'assistant', text: 'Ask me about current module status, recent incidents, pipeline health — or, if you\'re an admin, tell me to trigger/cancel/delete/rename a pipeline, manage targets or users, or update alert settings. I\'ll always confirm before making any change.' }
   ];
@@ -49,27 +59,105 @@ export class ChatComponent implements OnInit, OnDestroy {
   triggering = false;
   selectedEnvironment: string | null = null;
 
+  // Manual push-to-talk mic (existing button, full-page view only) — a single one-shot
+  // question, separate from the continuous conversation loop below.
   voiceSupported = false;
   listening = false;
+
+  // Continuous voice conversation (embedded console): tap the globe or the mic button to
+  // start — or say "Hey Jarvis" if wake-word is armed — then keep talking back and forth
+  // without repeating the wake word until a stop phrase, silence, or manual stop.
+  wakeWordSupported = false;
+  wakeWordEnabled = false;
+  conversing = false;
+  historyExpanded = false;
+  voiceDiagnostic: string | null = null;
 
   @ViewChild('scrollAnchor') scrollAnchor?: ElementRef<HTMLElement>;
 
   private sub?: Subscription;
+  private conversingSub?: Subscription;
+  private commandSub?: Subscription;
+  private diagnosticSub?: Subscription;
   private recognition: SpeechRecognitionLike | null = null;
 
   constructor(
     private chat: ChatService,
-    private statusService: StatusService
+    private statusService: StatusService,
+    private voiceActivity: VoiceActivityService,
+    private voice: VoiceService
   ) {}
 
   ngOnInit(): void {
     this.sub = this.statusService.environment$.subscribe((env) => (this.selectedEnvironment = env));
     this.setupSpeechRecognition();
+
+    this.wakeWordSupported = this.voiceActivity.supported;
+    this.wakeWordEnabled = this.voiceActivity.isEnabled;
+    this.conversingSub = this.voiceActivity.conversing$.subscribe((c) => (this.conversing = c));
+    this.commandSub = this.voiceActivity.command$.subscribe((transcript) => this.onVoiceCommand(transcript));
+    this.diagnosticSub = this.voiceActivity.diagnostic$.subscribe((d) => (this.voiceDiagnostic = d));
+
+    // Arm "Hey Jarvis" hands-free the moment the Dashboard loads — no click needed. This calls
+    // straight into SpeechRecognition.start(), which triggers the browser's own mic-permission
+    // prompt on first use (that does NOT require a user gesture, unlike audio autoplay); once
+    // granted, the browser remembers it for this origin and every later page load/login arms
+    // silently. If the user denies it, the resulting 'not-allowed' error is surfaced via
+    // voiceDiagnostic and they can still tap the globe/mic to talk manually.
+    if (this.embedded && this.wakeWordSupported) {
+      this.voiceActivity.enable();
+      this.wakeWordEnabled = true;
+    }
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+    this.conversingSub?.unsubscribe();
+    this.commandSub?.unsubscribe();
+    this.diagnosticSub?.unsubscribe();
     this.recognition?.stop();
+  }
+
+  get statusWord(): string {
+    if (this.asking) return 'THINKING';
+    if (this.conversing) return 'LISTENING';
+    if (this.wakeWordEnabled) return 'WAITING FOR "HEY JARVIS"';
+    return 'IDLE';
+  }
+
+  // Tap-to-talk: starts a continuous conversation immediately (no wake word needed). Tapping
+  // again while already conversing ends it. This is the primary activation gesture — also
+  // wired to a click on the Dashboard globe itself.
+  toggleConversation(): void {
+    if (this.voiceActivity.isConversing) {
+      this.voiceActivity.stopConversation();
+    } else {
+      this.voiceActivity.startConversationNow();
+    }
+  }
+
+  // Hands-free "Hey Jarvis" arm/disarm toggle (separate from tap-to-talk above).
+  toggleWakeWord(): void {
+    if (this.wakeWordEnabled) {
+      this.voiceActivity.disable();
+    } else {
+      this.voiceActivity.enable();
+    }
+    this.wakeWordEnabled = this.voiceActivity.isEnabled;
+  }
+
+  toggleHistory(): void {
+    this.historyExpanded = !this.historyExpanded;
+  }
+
+  private onVoiceCommand(transcript: string): void {
+    if (STOP_PHRASES.test(transcript)) {
+      this.voiceActivity.stopConversation();
+      void this.voice.speak('Okay.');
+      return;
+    }
+    this.question = transcript;
+    this.askViaVoice();
   }
 
   private setupSpeechRecognition(): void {
@@ -123,6 +211,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.messages.push({ role: 'user', text: q });
     this.question = '';
     this.asking = true;
+    if (this.embedded) this.historyExpanded = true;
 
     this.chat.ask(q, this.selectedEnvironment ?? undefined).subscribe({
       next: (res) => {
@@ -139,6 +228,43 @@ export class ChatComponent implements OnInit, OnDestroy {
         this.messages.push({ role: 'assistant', text: 'Something went wrong reaching the assistant.', configured: false });
         this.asking = false;
         this.scrollToBottom();
+      }
+    });
+
+    setTimeout(() => this.scrollToBottom());
+  }
+
+  // Same as ask(), but speaks the reply back and keeps the conversation going afterward —
+  // used for anything that came in via voice (wake word or tap-to-talk), never for typed
+  // questions. Mirrors the reference implementation's listen → think → speak → listen loop.
+  private askViaVoice(): void {
+    const q = this.question.trim();
+    if (!q || this.asking) return;
+
+    this.messages.push({ role: 'user', text: q });
+    this.question = '';
+    this.asking = true;
+    if (this.embedded) this.historyExpanded = true;
+
+    this.chat.ask(q, this.selectedEnvironment ?? undefined).subscribe({
+      next: async (res) => {
+        this.messages.push({
+          role: 'assistant',
+          text: res.answer,
+          configured: res.claudeConfigured,
+          pendingAction: res.pendingAction
+        });
+        this.asking = false;
+        this.scrollToBottom();
+        await this.voice.speak(res.answer);
+        this.voiceActivity.continueConversation();
+      },
+      error: async () => {
+        this.messages.push({ role: 'assistant', text: 'Something went wrong reaching the assistant.', configured: false });
+        this.asking = false;
+        this.scrollToBottom();
+        await this.voice.speak('Sorry, something went wrong reaching the assistant.');
+        this.voiceActivity.continueConversation();
       }
     });
 

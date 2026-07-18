@@ -361,8 +361,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 560px;
-  padding: 24px;
+  min-height: 460px;
+  padding: 12px;
   background: var(--surface);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -374,10 +374,9 @@
 .globe-canvas-wrap {
   position: relative;
   width: 100%;
-  max-width: 480px;
-  aspect-ratio: 1;
-  flex: none;
-  margin: 0 auto;
+  flex: 1;
+  min-height: 360px;
+  cursor: pointer;
 }
 
 .globe-canvas-wrap app-hud-globe {
@@ -411,96 +410,6 @@
   animation-duration: 90s;
 }
 
-/* Extra HUD elements around the globe: tick marks, crosshair, corner brackets,
-   scanning bar and radar sweep — all decorative, pointer-events: none. */
-.globe-reticle {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 100%;
-  aspect-ratio: 1;
-  pointer-events: none;
-  animation: hud-spin 45s linear infinite;
-}
-.tick-major {
-  position: absolute;
-  width: 2px;
-  height: 14px;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-  border-radius: 1px;
-}
-.tick-major.t1 { top: 0;   left: 50%; transform: translate(-50%, -50%); }
-.tick-major.t2 { bottom: 0; left: 50%; transform: translate(-50%, 50%); }
-.tick-major.t3 { left: 0;  top: 50%; transform: translate(-50%, -50%) rotate(90deg); }
-.tick-major.t4 { right: 0; top: 50%; transform: translate(50%, -50%) rotate(90deg); }
-.globe-crosshair {
-  position: absolute;
-  background: rgba(255, 43, 43, 0.14);
-  pointer-events: none;
-}
-.globe-crosshair.h { left: 10%; right: 10%; top: 50%; height: 1px; }
-.globe-crosshair.v { top: 10%; bottom: 10%; left: 50%; width: 1px; }
-
-.globe-scan {
-  position: absolute;
-  left: 6%; right: 6%;
-  height: 32%;
-  top: -20%;
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    rgba(0, 229, 255, 0.08) 40%,
-    rgba(255, 43, 43, 0.28) 55%,
-    rgba(255, 255, 255, 0.4) 60%,
-    rgba(255, 43, 43, 0.28) 65%,
-    rgba(0, 229, 255, 0.08) 80%,
-    transparent 100%);
-  filter: blur(1px);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: globe-scan-move 5.5s cubic-bezier(0.65, 0.05, 0.35, 1) infinite;
-  z-index: 3;
-}
-@keyframes globe-scan-move {
-  0%   { top: -20%; opacity: 0; }
-  15%  { opacity: 1; }
-  85%  { opacity: 1; }
-  100% { top: 105%; opacity: 0; }
-}
-
-.globe-radar {
-  position: absolute;
-  inset: 12%;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg,
-    rgba(255, 43, 43, 0.28) 0deg,
-    rgba(255, 43, 43, 0.08) 20deg,
-    transparent 55deg 360deg);
-  animation: hud-spin 4s linear infinite;
-  mix-blend-mode: screen;
-  filter: blur(1px);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.globe-corner {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  border-color: var(--accent);
-  border-style: solid;
-  pointer-events: none;
-  filter: drop-shadow(0 0 6px var(--accent-glow));
-  animation: corner-breath 3.2s ease-in-out infinite;
-}
-.globe-corner.tl { top: -4px;    left: -4px;    border-width: 2px 0 0 2px; }
-.globe-corner.tr { top: -4px;    right: -4px;   border-width: 2px 2px 0 0; }
-.globe-corner.bl { bottom: -4px; left: -4px;    border-width: 0 0 2px 2px; }
-.globe-corner.br { bottom: -4px; right: -4px;   border-width: 0 2px 2px 0; }
-@keyframes corner-breath {
-  0%, 100% { opacity: 0.75; }
-  50%      { opacity: 1; }
-}
 @keyframes hud-spin { to { transform: rotate(360deg); } }
 
 .assistant-title {
@@ -533,7 +442,7 @@
 .assistant-status.up { color: var(--signal-up); }
 
 @media (prefers-reduced-motion: reduce) {
-  .globe-ring, .globe-reticle, .globe-scan, .globe-radar, .globe-corner { animation: none; }
+  .globe-ring { animation: none; }
 }
 
 @media (max-width: 1180px) {

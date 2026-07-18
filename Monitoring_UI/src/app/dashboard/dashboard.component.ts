@@ -16,6 +16,8 @@ import { ServiceStatus, StatusResponse } from '../models/status.model';
 import { ModuleInsight } from '../models/history.model';
 import { MagneticDirective } from '../shared/magnetic.directive';
 import { HudGlobeComponent } from '../shared/hud-globe/hud-globe.component';
+import { ChatComponent } from '../chat/chat.component';
+import { VoiceActivityService } from '../services/voice-activity.service';
 
 type Severity = 'down' | 'degraded' | 'up' | 'unknown';
 type FleetStatus = 'up' | 'degraded' | 'down' | 'unknown';
@@ -23,7 +25,7 @@ type FleetStatus = 'up' | 'degraded' | 'down' | 'unknown';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, MagneticDirective, HudGlobeComponent],
+  imports: [CommonModule, MagneticDirective, HudGlobeComponent, ChatComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -55,8 +57,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     public auth: AuthService,
     private anim: AnimationService,
     private history: HistoryService,
-    private hostRef: ElementRef<HTMLElement>
+    private hostRef: ElementRef<HTMLElement>,
+    public voiceActivity: VoiceActivityService
   ) {}
+
+  // Tap the globe to start/stop talking to Jarvis immediately (no wake word needed) — mirrors
+  // the reference implementation's tap-globe-to-converse gesture.
+  onGlobeTap(): void {
+    if (this.voiceActivity.isConversing) {
+      this.voiceActivity.stopConversation();
+    } else {
+      this.voiceActivity.startConversationNow();
+    }
+  }
 
   async ngOnInit(): Promise<void> {
     this.environments = await this.statusService.loadEnvironments();

@@ -19,6 +19,13 @@ export class HudGlobeComponent implements AfterViewInit, OnChanges, OnDestroy {
   // white pulsing on degraded, angry saturated red on "down".
   @Input() status: 'up' | 'degraded' | 'down' | 'unknown' = 'unknown';
 
+  // Voice UI state. `listening` = wake word ("Hey Jarvis") was heard and Jarvis is capturing
+  // a command — switches the globe to a steady cyan glow. `voiceLevel` (0..1, from live mic
+  // RMS) drives an additional "beat" scale pulse on top of that glow while actual speech is
+  // detected; at ~0 (listening but silent) the globe only glows, it does not beat.
+  @Input() listening = false;
+  @Input() voiceLevel = 0;
+
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
   private camera?: THREE.PerspectiveCamera;
@@ -37,6 +44,15 @@ export class HudGlobeComponent implements AfterViewInit, OnChanges, OnDestroy {
   private speed = 0.0022;
   private readonly baseSpeed = 0.0022;
   private targetOpacity = 0.55;
+  // The globe's "resting" color for the current fleet status (red/white-blend), kept separate
+  // from `wireMaterial.color` — the cyan listening lerp below blends FROM this every frame
+  // rather than mutating the live color in place, so it always eases back to red once listening
+  // stops instead of getting stuck on cyan forever.
+  private statusColor = new THREE.Color(0xff2b2b);
+
+  // Smoothed copies of the voice inputs so glow/beat transitions don't snap frame-to-frame.
+  private smoothedListening = 0; // 0..1, eases toward `listening ? 1 : 0`
+  private smoothedVoiceLevel = 0; // 0..1, eases toward `voiceLevel`
 
   private readonly RED = new THREE.Color(0xff2b2b);
   private readonly WHITE = new THREE.Color(0xffffff);
@@ -301,20 +317,20 @@ export class HudGlobeComponent implements AfterViewInit, OnChanges, OnDestroy {
       case 'down':
         this.speed = 0.045;
         this.targetOpacity = 0.85;
-        this.wireMaterial.color.copy(this.RED);
+        this.statusColor.copy(this.RED);
         break;
       case 'degraded':
         this.speed = 0.015;
         this.targetOpacity = 0.9;
-        this.wireMaterial.color.lerpColors(this.RED, this.WHITE, 0.6);
+        this.statusColor.lerpColors(this.RED, this.WHITE, 0.6);
         break;
       case 'up':
         this.targetOpacity = 0.55;
-        this.wireMaterial.color.copy(this.RED);
+        this.statusColor.copy(this.RED);
         break;
       default:
         this.targetOpacity = 0.42;
-        this.wireMaterial.color.copy(this.RED);
+        this.statusColor.copy(this.RED);
     }
   }
 
@@ -331,6 +347,30 @@ export class HudGlobeComponent implements AfterViewInit, OnChanges, OnDestroy {
     }
     if (this.ring) this.ring.rotation.z += 0.003;
     if (this.reticle) this.reticle.rotation.z -= 0.004;
+
+    // Voice UI: ease toward the current listening/voiceLevel inputs so state changes (wake
+    // word heard, speech starts/stops) animate smoothly rather than snapping.
+    this.smoothedListening += ((this.listening ? 1 : 0) - this.smoothedListening) * 0.08;
+    this.smoothedVoiceLevel += (this.voiceLevel - this.smoothedVoiceLevel) * 0.15;
+
+    if (this.wireMaterial) {
+      // Blend FROM the resting status color every frame (not from whatever color is currently
+      // on the material) so this always eases back to red/white as `smoothedListening` decays
+      // to 0, instead of latching onto cyan permanently once a conversation starts.
+      this.wireMaterial.color.lerpColors(this.statusColor, this.CYAN, this.smoothedListening * 0.5);
+      if (this.smoothedListening > 0.01) {
+        // Extra opacity proportional to actual voice level for a "brighter while talking" feel.
+        const glowBoost = 0.25 + this.smoothedVoiceLevel * 0.4;
+        this.wireMaterial.opacity = Math.min(1, this.wireMaterial.opacity + glowBoost * this.smoothedListening);
+      }
+    }
+
+    // "Beat" — the whole globe scales in/out with actual detected speech volume. At zero
+    // voice level (listening but silent) this settles back to 1 — glow only, no beat.
+    if (this.globe) {
+      const beat = 1 + this.smoothedListening * this.smoothedVoiceLevel * 0.09 * (1 + Math.sin(t * 9) * 0.15);
+      this.globe.scale.setScalar(beat);
+    }
 
     // Beacon shockwave rings — each pulses on its own phase.
     for (const b of this.beacons) {

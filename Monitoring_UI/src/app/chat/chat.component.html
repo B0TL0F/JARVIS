@@ -1,3 +1,60 @@
+<ng-container *ngIf="embedded; else fullView">
+  <div class="jarvis-console">
+    <div class="console-status" [ngClass]="{ listening: conversing, thinking: asking }">{{ statusWord }}</div>
+    <div class="console-diagnostic" *ngIf="voiceDiagnostic">&#9888; {{ voiceDiagnostic }}</div>
+
+    <button type="button" class="history-toggle" (click)="toggleHistory()">
+      <span class="chevron" [class.open]="historyExpanded">^</span>
+      CHAT HISTORY &middot; {{ messages.length }}
+    </button>
+
+    <div class="console-log" *ngIf="historyExpanded">
+      <div *ngFor="let m of messages" class="msg" [ngClass]="m.role">
+        <div class="bubble" [ngClass]="{ warn: m.role === 'assistant' && m.configured === false }">
+          {{ m.text }}
+          <div class="action-row" *ngIf="m.pendingAction && !m.actionResolved">
+            <button type="button" class="confirm" [disabled]="triggering" (click)="confirmAction(m)">
+              {{ triggering ? 'Triggering…' : 'Confirm' }}
+            </button>
+            <button type="button" class="cancel" [disabled]="triggering" (click)="cancelAction(m)">Cancel</button>
+          </div>
+          <div class="action-resolved" *ngIf="m.actionResolved">
+            {{ m.actionResolved === 'confirmed' ? 'Confirmed' : 'Cancelled' }}
+          </div>
+        </div>
+      </div>
+      <div #scrollAnchor></div>
+      <div class="msg assistant" *ngIf="asking">
+        <div class="bubble thinking">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </div>
+    </div>
+
+    <form class="console-input" (ngSubmit)="ask()">
+      <button
+        type="button"
+        class="wake-btn"
+        *ngIf="wakeWordSupported"
+        [class.on]="conversing"
+        (click)="toggleConversation()"
+        [attr.aria-label]="conversing ? 'Stop talking to Jarvis' : 'Start talking to Jarvis'"
+        [attr.title]="conversing ? 'Listening… click to stop, or just say &quot;stop&quot;' : 'Click to talk, or say &quot;Hey Jarvis&quot; anytime'"
+      >&#127908;</button>
+      <input
+        type="text"
+        [(ngModel)]="question"
+        name="question"
+        placeholder="Ask Jarvis, or say &quot;Hey Jarvis&quot;…"
+        [disabled]="asking"
+        autocomplete="off"
+      />
+      <button type="submit" [disabled]="asking || !question.trim()">Send</button>
+    </form>
+  </div>
+</ng-container>
+
+<ng-template #fullView>
 <div class="chat-view">
   <div class="chat-header">
     <h2>Ask Jarvis</h2>
@@ -49,3 +106,4 @@
     <button type="submit" [disabled]="asking || !question.trim()">Ask</button>
   </form>
 </div>
+</ng-template>
