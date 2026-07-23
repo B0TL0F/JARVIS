@@ -76,10 +76,9 @@
               <span class="incident-text">{{ inc.summary }}</span>
               <span class="badge ongoing-badge" *ngIf="!inc.resolvedAtUtc">ONGOING</span>
             </div>
-            <details class="raw" *ngIf="inc.errorMessage">
-              <summary>Raw error</summary>
+            <div class="incident-error" *ngIf="inc.errorMessage">
               <code>{{ inc.errorMessage }}</code>
-            </details>
+            </div>
           </div>
         </div>
         <ng-template #noIncidents>

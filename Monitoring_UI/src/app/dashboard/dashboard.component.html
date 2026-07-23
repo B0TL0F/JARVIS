@@ -81,14 +81,17 @@
         <span class="hud-panel-title">Attention</span>
       </div>
       <div class="hud-module-list" *ngIf="attentionModules.length; else allNominal">
-        <div class="hud-module-row" *ngFor="let m of attentionModules; trackBy: trackByModule" [ngClass]="severity(m)">
-          <i class="dot" [ngClass]="severity(m)"></i>
-          <span class="hud-module-name">{{ m.module }}</span>
-          <span class="check-badges">
-            <span class="check-badge" [ngClass]="checkClass(m.api)" [title]="checkTooltip('API', m.api)">API</span>
-            <span class="check-badge" [ngClass]="checkClass(m.db)" [title]="checkTooltip('DB', m.db)">DB</span>
-          </span>
-          <span class="hud-module-uptime">{{ m.uptimePercent24h }}%</span>
+        <div class="hud-module-row-wrap" *ngFor="let m of attentionModules; trackBy: trackByModule">
+          <div class="hud-module-row" [ngClass]="severity(m)">
+            <i class="dot" [ngClass]="severity(m)"></i>
+            <span class="hud-module-name">{{ m.module }}</span>
+            <span class="check-badges">
+              <span class="check-badge" [ngClass]="checkClass(m.api)" [title]="checkTooltip('API', m.api)">API</span>
+              <span class="check-badge" [ngClass]="checkClass(m.db)" [title]="checkTooltip('DB', m.db)">DB</span>
+            </span>
+            <span class="hud-module-uptime">{{ m.uptimePercent24h }}%</span>
+          </div>
+          <div class="hud-module-error" *ngIf="attentionError(m) as err">{{ err }}</div>
         </div>
       </div>
       <ng-template #allNominal><div class="hud-empty">All systems nominal</div></ng-template>

@@ -53,7 +53,10 @@
                 <td class="mono healthcheck" [title]="t.healthCheckUrl || 'No API host/route configured'">
                   {{ t.healthCheckUrl || '—' }}
                 </td>
-                <td><span class="chip origin" [ngClass]="t.origin">{{ t.origin }}</span></td>
+                <td>
+                  <span class="chip origin" [ngClass]="t.origin" [title]="t.sourceFile ? ('Imported from ' + t.sourceFile) : ''">{{ t.origin }}</span>
+                  <span class="source-file mono" *ngIf="t.sourceFile">{{ t.sourceFile }}</span>
+                </td>
                 <td class="right">
                   <button class="header-btn sm" (click)="startEdit(t)">Edit</button>
                   <button class="header-btn sm del" *ngIf="t.id !== null" (click)="remove(t)">Delete</button>

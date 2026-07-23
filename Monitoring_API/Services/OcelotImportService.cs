@@ -210,6 +210,37 @@ public class OcelotImportService
         return result;
     }
 
+    // Removes every "ocelot"-origin ImportedTarget whose SourceFile no longer exists in
+    // the ocelot/ folder — keeps deletions in that folder actually taking effect instead
+    // of leaving orphaned environments/targets in the DB forever. Manual/override rows
+    // (SourceFile empty) are never touched. Runs at startup and on every Deleted/Renamed
+    // FileSystemWatcher event.
+    public async Task SyncDeletionsAsync(CancellationToken ct)
+    {
+        if (!Directory.Exists(_ocelotDir)) return;
+
+        var existingFiles = new HashSet<string>(
+            Directory.EnumerateFiles(_ocelotDir).Select(Path.GetFileName)!,
+            StringComparer.OrdinalIgnoreCase);
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
+
+        var orphaned = await db.ImportedTargets
+            .Where(t => t.Origin == "ocelot" && t.SourceFile != "")
+            .ToListAsync(ct);
+
+        var toRemove = orphaned.Where(t => !existingFiles.Contains(t.SourceFile)).ToList();
+        if (toRemove.Count == 0) return;
+
+        db.ImportedTargets.RemoveRange(toRemove);
+        await db.SaveChangesAsync(ct);
+
+        var envs = string.Join(", ", toRemove.Select(t => t.Environment).Distinct());
+        _logger.LogInformation("[OCELOT] Removed {Count} target(s) whose source file was deleted (environments: {Envs})",
+            toRemove.Count, envs);
+    }
+
     // "Ocelot.TestingD.JSON" -> tag "TESTINGD" -> "DEV" (falls back to the tag itself).
     private static string GroupNameFromFile(string filePath)
     {

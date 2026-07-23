@@ -94,6 +94,7 @@ input:focus { outline: none; border-color: rgba(255, 43, 43, 0.55); box-shadow: 
 .origin.ocelot { background: var(--accent-soft); color: var(--accent-hover); border-color: rgba(99, 102, 241, 0.25); }
 .origin.config { background: rgba(148, 163, 184, 0.14); color: #b6c2d6; border-color: rgba(148, 163, 184, 0.3); }
 .origin.override { background: rgba(251, 191, 36, 0.14); color: var(--warn); border-color: rgba(251, 191, 36, 0.3); }
+.source-file { display: block; margin-top: 3px; font-size: 0.68rem; color: var(--muted); }
 
 .muted-chip {
   display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 0.68rem;

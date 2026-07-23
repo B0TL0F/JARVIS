@@ -89,6 +89,7 @@ public class TargetsController : ControllerBase
                 ApiHost = t.ApiHost,
                 RoutePrefix = t.RoutePrefix,
                 Origin = origin,
+                SourceFile = string.IsNullOrEmpty(t.SourceFile) ? null : t.SourceFile,
                 HealthCheckUrl = HealthCheckUrl(t.ApiHost, t.RoutePrefix),
                 CreatedAtUtc = t.CreatedAtUtc
             });
@@ -358,6 +359,7 @@ public class TargetsController : ControllerBase
         ApiHost = t.ApiHost,
         RoutePrefix = t.RoutePrefix,
         Origin = t.Origin,
+        SourceFile = string.IsNullOrEmpty(t.SourceFile) ? null : t.SourceFile,
         HealthCheckUrl = HealthCheckUrl(t.ApiHost, t.RoutePrefix),
         CreatedAtUtc = t.CreatedAtUtc
     };

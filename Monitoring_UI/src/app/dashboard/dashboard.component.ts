@@ -118,6 +118,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return check.isUp ? 'up' : 'down';
   }
 
+  // Short always-visible reason a module is down/degraded, shown under its row in
+  // the Attention panel — the full detail is still available via checkTooltip() on hover.
+  attentionError(module: ServiceStatus): string | null {
+    const failing = [module.api, module.db].filter((c) => c && !c.isUp) as { errorMessage: string | null; httpStatusCode: number | null }[];
+    for (const c of failing) {
+      if (c.errorMessage) return this.truncate(c.errorMessage);
+      if (c.httpStatusCode !== null) return `HTTP ${c.httpStatusCode}`;
+    }
+    return null;
+  }
+
+  private truncate(text: string, max = 120): string {
+    return text.length > max ? `${text.slice(0, max)}…` : text;
+  }
+
   checkTooltip(label: string, check: ServiceStatus['api']): string {
     if (!check) return `${label}: no data`;
     const parts = [`${label}: ${check.isUp ? 'UP' : 'DOWN'}`];

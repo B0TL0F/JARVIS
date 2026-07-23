@@ -37,6 +37,7 @@ public class TargetDto
     public string ApiHost { get; set; } = string.Empty;
     public string RoutePrefix { get; set; } = string.Empty;
     public string Origin { get; set; } = string.Empty;         // "config" | "manual" | "ocelot" | "override"
+    public string? SourceFile { get; set; }                    // originating ocelot filename, if any
     public string? HealthCheckUrl { get; set; }
     public DateTime? CreatedAtUtc { get; set; }
 }

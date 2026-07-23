@@ -12,6 +12,7 @@ export interface ManagedTarget {
   apiHost: string;
   routePrefix: string;
   origin: string;        // "config" | "manual" | "ocelot" | "override"
+  sourceFile: string | null; // originating ocelot filename, if imported that way
   healthCheckUrl: string | null;
   createdAtUtc: string | null;
 }

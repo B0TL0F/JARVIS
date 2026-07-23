@@ -191,11 +191,9 @@
 .badge.db { background: rgba(167, 139, 250, 0.14); color: #a78bfa; border-color: rgba(167, 139, 250, 0.35); }
 .badge.ongoing-badge { background: rgba(248, 113, 113, 0.14); color: var(--error, #f87171); border-color: rgba(248, 113, 113, 0.35); }
 
-.raw { margin-top: 4px; font-size: 0.74rem; }
-.raw summary { cursor: pointer; color: var(--muted); }
-.raw code {
+.incident-error { margin-top: 4px; font-size: 0.74rem; }
+.incident-error code {
   display: block;
-  margin-top: 4px;
   padding: 8px 10px;
   border-radius: var(--radius-xs);
   background: var(--surface-hover);

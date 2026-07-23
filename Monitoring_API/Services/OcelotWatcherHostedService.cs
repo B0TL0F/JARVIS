@@ -44,6 +44,9 @@ public class OcelotWatcherHostedService : BackgroundService
         {
             await _importer.ImportFileAsync(file, stoppingToken);
         }
+        // Reconcile deletions that happened while Jarvis wasn't running, so a removed
+        // ocelot file's environment doesn't linger forever.
+        await _importer.SyncDeletionsAsync(stoppingToken);
 
         _watcher = new FileSystemWatcher(_ocelotDir)
         {
@@ -52,6 +55,8 @@ public class OcelotWatcherHostedService : BackgroundService
         };
         _watcher.Created += OnFileEvent;
         _watcher.Changed += OnFileEvent;
+        _watcher.Deleted += OnFileDeleted;
+        _watcher.Renamed += OnFileDeleted;
 
         _logger.LogInformation("[OCELOT] Watcher active → {Dir}", _ocelotDir);
 
@@ -81,6 +86,24 @@ public class OcelotWatcherHostedService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[OCELOT] Runtime import failed for {File}", e.Name);
+            }
+        });
+    }
+
+    private void OnFileDeleted(object sender, FileSystemEventArgs e)
+    {
+        // Debounce briefly — a Rename fires Deleted+Created in quick succession and we
+        // don't want to race the Created side's import.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(2000);
+                await _importer.SyncDeletionsAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[OCELOT] Deletion sync failed after {File} removed/renamed", e.Name);
             }
         });
     }

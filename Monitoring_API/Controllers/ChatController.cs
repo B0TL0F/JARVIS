@@ -121,7 +121,7 @@ public class ChatController : ControllerBase
 
         var answer = await _claude.CompleteAsync(systemPrompt, question, maxTokens: 500, ct: ct);
         return answer is null
-            ? NotConfiguredResponse()
+            ? await NotConfiguredResponseAsync(ct)
             : new ChatResponseDto { Answer = answer.Trim(), ClaudeConfigured = true };
     }
 
@@ -389,11 +389,17 @@ public class ChatController : ControllerBase
         var wantsUser = Matches(UserKeywords);
         var wantsAlerts = Matches(AlertKeywords);
         var wantsRemediation = Matches(RemediationKeywords);
-        var noneMatched = !wantsPipeline && !wantsTarget && !wantsUser && !wantsAlerts && !wantsRemediation;
+        // NOTE: this used to fall back to "load every catalog + every tool" when no keyword
+        // matched — meant for genuinely ambiguous admin requests, but it also fired for plain
+        // small talk ("what r u doing"), ballooning a trivial question to ~7K+ tokens and
+        // blowing free-tier per-minute token limits. An unmatched question was never going to
+        // trigger a tool call anyway (the system prompt already requires an unambiguous keyword
+        // match), so there's nothing lost by keeping it lightweight instead — every catalog/tool
+        // below is now gated purely on its own keyword match.
 
         // Remediation-rule creation needs the pipeline catalog too (to validate pipelineName).
-        var pipelineCatalog = (wantsPipeline || wantsRemediation || noneMatched) ? await _context.GetBuildPipelineCatalogAsync(ct) : new List<BuildPipelineDto>();
-        var userCatalog = (wantsUser || noneMatched) ? await _context.GetUsersCatalogAsync(ct) : new List<AppUser>();
+        var pipelineCatalog = (wantsPipeline || wantsRemediation) ? await _context.GetBuildPipelineCatalogAsync(ct) : new List<BuildPipelineDto>();
+        var userCatalog = wantsUser ? await _context.GetUsersCatalogAsync(ct) : new List<AppUser>();
 
         // Longest-match wins — e.g. "QATEST" must not be matched by the shorter "QA" just
         // because "QATEST" contains "QA" as a substring. Shared by target and monitored-module
@@ -413,7 +419,7 @@ public class ChatController : ControllerBase
         var targetCatalog = new List<ImportedTarget>();
         var targetsTruncated = false;
         const int MaxTargetsListed = 60;
-        if (wantsTarget || noneMatched)
+        if (wantsTarget)
         {
             var allTargets = await _context.GetTargetsCatalogAsync(ct);
             var namedEnv = FindNamedEnvironment(allTargets.Select(t => t.Environment));
@@ -433,7 +439,7 @@ public class ChatController : ControllerBase
         var monitoredModulesCatalog = new List<(string Environment, string Module)>();
         var modulesTruncated = false;
         const int MaxModulesListed = 60;
-        if (wantsRemediation || noneMatched)
+        if (wantsRemediation)
         {
             var allModules = await _context.GetMonitoredModulesCatalogAsync(ct);
             var namedEnv = FindNamedEnvironment(allModules.Select(m => m.Environment));
@@ -450,14 +456,14 @@ public class ChatController : ControllerBase
 
         // Read-only — no tool needed, just fed into the prompt so "what rules exist" can be
         // answered directly from LIVE DATA, same as pipelines/targets/users.
-        var remediationRulesCatalog = (wantsRemediation || noneMatched) ? await _context.GetRemediationRulesCatalogAsync(ct) : new List<RemediationRule>();
+        var remediationRulesCatalog = wantsRemediation ? await _context.GetRemediationRulesCatalogAsync(ct) : new List<RemediationRule>();
 
         var tools = new List<ClaudeToolDefinition>();
-        if (wantsPipeline || noneMatched) tools.AddRange(new[] { TriggerBuildTool, CancelBuildTool, DeletePipelineTool, RenamePipelineTool });
-        if (wantsTarget || noneMatched) tools.AddRange(new[] { CreateTargetTool, UpdateTargetTool, DeleteTargetTool });
-        if (wantsUser || noneMatched) tools.AddRange(new[] { CreateUserTool, DeleteUserTool, ChangeUserRoleTool });
-        if (wantsAlerts || noneMatched) tools.Add(UpdateAlertsTool);
-        if (wantsRemediation || noneMatched) tools.Add(CreateRemediationRuleTool);
+        if (wantsPipeline) tools.AddRange(new[] { TriggerBuildTool, CancelBuildTool, DeletePipelineTool, RenamePipelineTool });
+        if (wantsTarget) tools.AddRange(new[] { CreateTargetTool, UpdateTargetTool, DeleteTargetTool });
+        if (wantsUser) tools.AddRange(new[] { CreateUserTool, DeleteUserTool, ChangeUserRoleTool });
+        if (wantsAlerts) tools.Add(UpdateAlertsTool);
+        if (wantsRemediation) tools.Add(CreateRemediationRuleTool);
 
         var promptSections = new List<string>();
         if (pipelineCatalog.Count > 0 || wantsPipeline || wantsRemediation)
@@ -510,7 +516,7 @@ public class ChatController : ControllerBase
         var result = await _claude.CompleteWithToolsAsync(systemPrompt, question, tools, maxTokens: 500, ct: ct);
         if (result is null)
         {
-            return NotConfiguredResponse();
+            return await NotConfiguredResponseAsync(ct);
         }
 
         if (result.ToolName is not null && result.ToolInput is JsonElement input)
@@ -940,9 +946,25 @@ public class ChatController : ControllerBase
         return new string(result);
     }
 
-    private static ChatResponseDto NotConfiguredResponse() => new()
+    // Reports the actually-active provider (not always "Claude") so a rate limit or bad key on
+    // Gemini/Groq doesn't get misattributed to Claude — IClaudeService's CompleteAsync/
+    // CompleteWithToolsAsync return null for any failure (missing key, HTTP error, rate limit),
+    // so this can't name the exact cause, only point at Settings/logs for it.
+    private async Task<ChatResponseDto> NotConfiguredResponseAsync(CancellationToken ct)
     {
-        Answer = "AI assistant is not configured (no Claude API key set) or the request failed. Please check Settings.",
-        ClaudeConfigured = false
-    };
+        var provider = await _settings.GetEffectiveAsync(Models.SettingKeys.AiProvider, ct);
+        var providerName = provider?.ToLowerInvariant() switch
+        {
+            "gemini" => "Gemini",
+            "groq" => "Groq",
+            _ => "Claude"
+        };
+        return new ChatResponseDto
+        {
+            Answer = $"The {providerName} AI assistant isn't responding right now — it may be unconfigured, " +
+                     "rate-limited, or the request failed. Check Settings, or the server logs for the exact cause.",
+            ClaudeConfigured = false
+        };
+    }
+
 }

@@ -68,6 +68,13 @@ export class VoiceActivityService {
   private micStream: MediaStream | null = null;
   private rafId: number | null = null;
   private commandTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  // Chromium's continuous SpeechRecognition is known to silently stop delivering
+  // results/events without ever firing onend — with no visible symptom other than the
+  // wake word just stopping forever. This watchdog periodically force-restarts wake
+  // listening if it's been "running" longer than any real recognizer session should need.
+  private static readonly WATCHDOG_INTERVAL_MS = 20000;
+  private watchdogId: ReturnType<typeof setInterval> | null = null;
+  private wakeRecognitionStartedAt = 0;
   // Set right before a command-capture recognizer successfully returns a transcript, so its
   // `onend` (which always fires right after `onresult`) knows to leave the mic/metering running
   // for the caller's continueConversation() call instead of tearing down and resuming wake-word
@@ -115,10 +122,12 @@ export class VoiceActivityService {
     this._diagnostic.next(null);
     this._enabled.next(true);
     this.startWakeListening();
+    this.startWatchdog();
   }
 
   disable(): void {
     this._enabled.next(false);
+    this.stopWatchdog();
     this.stopWakeListening();
     this.stopConversation();
   }
@@ -196,21 +205,66 @@ export class VoiceActivityService {
     };
     rec.onend = () => {
       // Browsers stop continuous recognition after a period of silence — restart it as long
-      // as the feature is still enabled and we're not mid-conversation.
+      // as the feature is still enabled and we're not mid-conversation. A failed restart here
+      // is surfaced (not swallowed) so a dead wake-word listener is visible instead of just
+      // silently never triggering again.
       if (this._enabled.value && !this._conversing.value) {
-        try {
-          rec.start();
-        } catch {
-          // Already started / transient — the next onend will retry.
-        }
+        this.restartWakeRecognition(rec, 'onend');
       }
     };
 
     this.wakeRecognition = rec;
+    this.wakeRecognitionStartedAt = Date.now();
     try {
       rec.start();
-    } catch {
-      // Ignore — most likely "already started".
+    } catch (err) {
+      console.warn('[VoiceActivityService] wake-word start() failed:', err);
+      this._diagnostic.next('"Hey Jarvis" listening failed to start — retrying…');
+      // Most likely "already started" (harmless) or a transient failure — retry shortly
+      // instead of leaving wake listening permanently dead with no visible sign.
+      setTimeout(() => {
+        if (this._enabled.value && !this._conversing.value) this.startWakeListening();
+      }, 2000);
+    }
+  }
+
+  // Attempts an in-place restart first (cheapest, matches prior behavior); if that throws,
+  // tears down and builds a fresh recognizer — some Chromium failure modes leave the old
+  // instance permanently unusable even though it still exists.
+  private restartWakeRecognition(rec: SpeechRecognitionLike, reason: string): void {
+    try {
+      rec.start();
+      this.wakeRecognitionStartedAt = Date.now();
+    } catch (err) {
+      console.warn(`[VoiceActivityService] wake-word restart (${reason}) failed, rebuilding recognizer:`, err);
+      this.wakeRecognition = null;
+      setTimeout(() => {
+        if (this._enabled.value && !this._conversing.value) this.startWakeListening();
+      }, 1000);
+    }
+  }
+
+  // Periodically verifies wake listening hasn't silently died (Chromium's continuous
+  // SpeechRecognition is known to stop delivering results without ever firing onend). If the
+  // current recognizer instance has been "running" far longer than any real session should,
+  // force a stop+restart cycle.
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.watchdogId = setInterval(() => {
+      if (!this._enabled.value || this._conversing.value || !this.wakeRecognition) return;
+      const stale = Date.now() - this.wakeRecognitionStartedAt > VoiceActivityService.WATCHDOG_INTERVAL_MS * 3;
+      if (stale) {
+        console.warn('[VoiceActivityService] wake-word watchdog: forcing restart (no activity for too long)');
+        this.stopWakeListening();
+        this.startWakeListening();
+      }
+    }, VoiceActivityService.WATCHDOG_INTERVAL_MS);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogId) {
+      clearInterval(this.watchdogId);
+      this.watchdogId = null;
     }
   }
 

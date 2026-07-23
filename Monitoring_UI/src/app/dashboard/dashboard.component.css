@@ -315,6 +315,14 @@
   color: var(--muted);
 }
 
+.hud-module-error {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: #fca5a5;
+  padding: 0 8px 4px 18px;
+  word-break: break-word;
+}
+
 .check-badges {
   display: flex;
   gap: 4px;
